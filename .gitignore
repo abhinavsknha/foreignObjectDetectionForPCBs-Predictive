@@ -18,6 +18,9 @@ env/
 .venv/
 pip-log.txt
 pip-delete-this-directory.txt
+supabase.txt
+*.key
+*.pem
 
 # Machine Learning, Datasets & Heavy Binaries
 MODEL RESULTS/

@@ -138,43 +138,120 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
   return (
     <div className="w-full max-w-xl mx-auto">
       <motion.div
-        className={`relative overflow-hidden border-4 border-black p-12 text-center flex flex-col items-center justify-center min-h-[300px] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-colors ${
-          isDragging ? "bg-black text-white" : "bg-white text-black hover:bg-gray-50"
+        className={`relative overflow-hidden border-4 border-black p-10 text-center flex flex-col items-center justify-center min-h-[340px] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-colors ${
+          isDragging ? "bg-black text-white" : "bg-white text-black"
         }`}
+        animate={{ scale: isDragging ? 1.02 : 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
         onDrop={handleDrop}
       >
+        {/* Background mechanical grid lines */}
+        <div className="absolute inset-0 pointer-events-none opacity-5 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]" />
+
+        {/* Industrial laser scan bar active during uploading and processing */}
+        {(status === "uploading" || status === "processing") && (
+          <motion.div 
+            className="absolute left-0 right-0 h-1 bg-yellow-400 shadow-[0_0_12px_3px_rgba(234,179,8,0.9)] z-10 pointer-events-none"
+            animate={{ top: ["0%", "100%", "0%"] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+          />
+        )}
+
         <AnimatePresence mode="wait">
           {status === "idle" && (
-            <motion.div key="idle" className="flex flex-col items-center gap-4">
-              <UploadCloud className="w-12 h-12" />
+            <motion.div 
+              key="idle" 
+              className="flex flex-col items-center gap-4 relative z-0"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            >
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                className="p-4 bg-yellow-300 border-3 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+              >
+                <UploadCloud className="w-10 h-10 stroke-[2.5]" />
+              </motion.div>
+
               <div>
-                <h3 className="text-xl font-bold uppercase tracking-tighter">Initialize Inference</h3>
-                <p className="font-mono text-sm mt-2 uppercase">Drag & Drop Target Image</p>
+                <h3 className="text-2xl font-black uppercase tracking-tight">Initialize Inspection</h3>
+                <p className="font-mono text-xs mt-1 text-gray-600 font-bold uppercase tracking-wider">Drag & drop raw PCB scan or browse disk</p>
               </div>
-              <label className="mt-4 px-8 py-3 bg-black text-white font-bold uppercase cursor-pointer hover:bg-gray-800 border-2 border-black">
-                Select File
-                <input type="file" className="hidden" onChange={(e) => {
+
+              <motion.label 
+                className="mt-2 px-8 py-3.5 bg-black text-white font-mono font-black uppercase cursor-pointer border-3 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] tracking-wider"
+                whileHover={{ x: -2, y: -2, boxShadow: "8px 8px 0px 0px rgba(0,0,0,1)" }}
+                whileTap={{ x: 2, y: 2, boxShadow: "0px 0px 0px 0px rgba(0,0,0,1)" }}
+                transition={{ type: "spring", stiffness: 500, damping: 20 }}
+              >
+                Select Target Image
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                   if (e.target.files?.length) uploadFile(e.target.files[0]);
                 }} />
-              </label>
+              </motion.label>
             </motion.div>
           )}
 
           {status === "uploading" && (
-            <motion.div key="uploading" className="flex flex-col items-center gap-4">
-              <Loader2 className="w-12 h-12 animate-spin" />
-              <h3 className="text-xl font-bold uppercase">Uploading Protocol...</h3>
-              <p className="font-mono text-sm">Direct to Node</p>
+            <motion.div 
+              key="uploading" 
+              className="flex flex-col items-center gap-4 relative z-0"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                className="p-3 bg-black text-white border-2 border-black"
+              >
+                <Loader2 className="w-8 h-8" />
+              </motion.div>
+              <h3 className="text-xl font-black uppercase tracking-tight">Ingesting Scan Binary...</h3>
+              <p className="font-mono text-xs bg-gray-200 px-3 py-1 border border-black font-bold">DISPATCHING PAYLOAD</p>
             </motion.div>
           )}
 
           {status === "processing" && (
-            <motion.div key="processing" className="flex flex-col items-center gap-4">
-              <Loader2 className="w-12 h-12 animate-spin" />
-              <h3 className="text-xl font-bold uppercase">Engine Active</h3>
-              <p className="font-mono text-sm">Celery Sleeper Cell Triggered<br/>Polling Redis Broker...</p>
+            <motion.div 
+              key="processing" 
+              className="flex flex-col items-center gap-4 relative z-0 w-full max-w-sm"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <motion.div 
+                animate={{ rotate: [0, 90, 180, 270, 360] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="p-3 bg-yellow-300 text-black border-3 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+              >
+                <Loader2 className="w-8 h-8 stroke-[3]" />
+              </motion.div>
+
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Dual-Track Engine Active</h3>
+                <p className="font-mono text-xs text-gray-700 mt-1 font-bold uppercase">
+                  YOLO26n + RT-DETR ➔ WBF Fusion
+                </p>
+              </div>
+
+              {/* Animated Progress Meter */}
+              <div className="w-full bg-gray-200 border-2 border-black h-4 p-0.5 overflow-hidden">
+                <motion.div 
+                  className="bg-black h-full"
+                  initial={{ width: "5%" }}
+                  animate={{ width: ["15%", "45%", "85%", "95%"] }}
+                  transition={{ duration: 2.5, ease: "easeInOut", repeat: Infinity }}
+                />
+              </div>
+
+              <span className="font-mono text-[10px] uppercase font-bold text-gray-500">
+                Awaiting Message Broker Return
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
