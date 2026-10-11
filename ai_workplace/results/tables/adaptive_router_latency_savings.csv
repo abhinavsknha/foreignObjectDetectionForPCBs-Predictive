@@ -1,0 +1,9 @@
+Metric,Value
+Total Images Analyzed,"10,259"
+Direct Route Images (No SR needed),"5,656"
+SR Route Images (Micro-defects enhanced),"4,603"
+Selective SR Percentage,44.87%
+Direct Computation Saving Percentage,55.13%
+All-SR Expected Processing Time (hours),0.11 hrs
+Adaptive Expected Processing Time (hours),0.05 hrs
+Net Latency Reduction per Image (ms),22.1 ms / image

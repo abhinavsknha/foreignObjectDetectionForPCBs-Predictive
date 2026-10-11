@@ -1,0 +1,18 @@
+# PCB Surface Defect Dataset Configuration (Local)
+path: C:/Users/Abhinav/Documents/VIT/4th Year/Projects/FOD_Predictive_Detection/Dataset/DsPCBSD+/Data_YOLO
+train: images/train
+val: images/val
+test: images/val  # fallback test set to val
+
+nc: 9
+names:
+  0: SH
+  1: SP
+  2: SC
+  3: OP
+  4: MB
+  5: HB
+  6: CS
+  7: CFO
+  8: BMFO
+

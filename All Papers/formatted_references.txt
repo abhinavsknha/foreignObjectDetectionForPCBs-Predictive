@@ -1,0 +1,37 @@
+[1] X. Ye, L. Huang, J. Wang, X. Hu, J. Xu, and C. Zhang, "A Lightweight PCB Defect Detection Algorithm Based on an Improved YOLOv11s," IEEE Access, vol. 14, pp. 56413-56426, Mar. 2026.
+
+[2] Y. Li, Y. Wang, J. Liu, K. Wu, H. S. Abdullahi, P. Lv, and H. Zhang, "Lightweight PCB defect detection method based on SCF-YOLO," PLoS ONE, vol. 20, no. 4, e0318033, Apr. 2025.
+
+[3] X. Kong, G. Liu, and Y. Gao, "GESC-YOLO: Improved Lightweight Printed Circuit Board Defect Detection Based Algorithm," Sensors, vol. 25, 3052, May 2025.
+
+[4] Y. Chu, X. Liu, X. Zhang, and H. Liu, "A lightweight PCB defect detection method based on group convolution and adaptive pruning," PeerJ Comput. Sci., vol. 11, e3243, Oct. 2025.
+
+[5] X. Yin, Z. Zhao, and L. Weng, "MAS-YOLO: A Lightweight Detection Algorithm for PCB Defect Detection Based on Improved YOLOv12," Appl. Sci., vol. 15, 6238, Jun. 2025.
+
+[6] P. Selvam, R. Rajasekar, C. Gunasundari, S. J. Priya, M. Murugappan, and M. E. H. Chowdhury, "YOLO-DefXpert: An Advanced Defect Detection on PCB Surfaces Using Improved YOLOv11 Algorithm," IEEE Access, vol. 13, pp. 143086-143101, Aug. 2025.
+
+[7] Z. Chen and B. Liu, "A High-Accuracy PCB Defect Detection Algorithm Based on Improved YOLOv12," Symmetry, vol. 17, 978, Jun. 2025.
+
+[8] W. Chen, X. Ke, and S. Meng, "Small defect detection in printed circuit boards based on the multiscale edge strengthening and an improved YOLOv10," Sci. Rep., vol. 15, 36445, 2025.
+
+[9] A. Wang, J. Yan, and Z. Wang, "PCB Defect Detection Based on Improved YOLOv8n," in Proc. 4th Int. Conf. Artif. Intell. Comput. Inf. Technol. (AICIT), 2025.
+
+[10] M. Zhao, H. Xu, S. Biibosunova, and S. Zhang, "PCB Board Defect Detection Algorithm Based on Improved YOLOv8," in Proc. 10th Int. Symp. Adv. Electr. Electron. Comput. Eng. (ISAEECE), 2025.
+
+[11] A. Wei, "NeoPCB-YOLO: Next-generation Enhanced Optimization YOLO for PCB," in Proc. 5th Int. Conf. Electron. Inf. Eng. Comput. Sci. (EIECS), 2025.
+
+[13] X. He and M. Xie, "ABF-YOLO: A Fine-Grained PCB Defect Detection Framework Integrating Axial Attention and Bidirectional Feature Fusion," IEEE Trans. Consum. Electron., vol. 71, no. 3, pp. 8562-8570, Aug. 2025.
+
+[14] M. Mounika, M. Gokulprasanth, and G. Vadivu, "YOLOV8X-HICAUPS: An Attention Based Approach for Accurate PCB Defect Detection," Int. J. Eng. Appl. Sci. Technol., vol. 9, no. 11, pp. 80-92, Mar. 2025.
+
+[15] J. Huang, F. Zhao, and L. Chen, "Defect Detection Network In PCB Circuit Devices Based on GAN Enhanced YOLOv11," Appl. Comput. Eng., 2025.
+
+[16] Z. F. Elsharkawy, "Enhanced YOLOv11 framework for high precision defect detection in printed circuit boards," Sci. Rep., vol. 15, 42550, 2025.
+
+[17] Z. Wei, F. Yang, K. Zhong, and L. Yao, "PCB-YOLO: Enhancing PCB surface defect detection with coordinate attention and multi-scale feature fusion," PLoS ONE, vol. 20, no. 6, e0323684, Jun. 2025.
+
+[18] C. Song, Y. Zhou, Y. Ma, Q. Qi, Z. Wang, and K. Hu, "YOLO-HDEW: An Efficient PCB Defect Detection Model," Electronics, vol. 14, 3383, Aug. 2025.
+
+[19] J. Yu, J. Tang, and Z. Tang, "Research on Lightweight PCB Defect Detection Algorithm based on YoloV11," Int. J. Comput. Appl. Technol. Res., vol. 14, no. 9, pp. 1-5, 2025.
+
+[20] A. Niaz, M. Umraiz, S. Soomro, and K. N. Choi, "Vision transformer and Mamba-attention fusion for high-precision PCB defect detection," PLoS ONE, vol. 20, no. 9, e0331175, Sep. 2025.

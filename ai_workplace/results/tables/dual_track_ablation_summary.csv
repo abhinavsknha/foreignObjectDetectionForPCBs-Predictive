@@ -1,0 +1,4 @@
+Model / Ensemble,Precision,Recall,F1-Score,True Positives,False Positives,False Negatives (Misses)
+YOLO,0.634,0.6578,0.6457,123,71,64
+RT-DETR,0.4924,0.8663,0.6279,162,167,25
+Fused (WBF),0.5192,0.8663,0.6493,162,150,25

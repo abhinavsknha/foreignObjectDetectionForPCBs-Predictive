@@ -1,0 +1,59 @@
+flowchart TB
+    %% ==========================================
+    %% Publication-Grade 2-Row Architecture Flow
+    %% Optimized for FigJam & Academic Manuscripts
+    %% ==========================================
+
+    %% Styles & Color Palette
+    classDef inputStyle fill:#1E293B,stroke:#0F172A,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef routerStyle fill:#2563EB,stroke:#1D4ED8,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef routeOption fill:#F8FAFC,stroke:#94A3B8,stroke-width:2px,color:#0F172A,rx:6px,ry:6px;
+    classDef yoloStyle fill:#EA580C,stroke:#C2410C,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef detrStyle fill:#7C3AED,stroke:#6D28D9,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef fusionStyle fill:#DC2626,stroke:#B91C1C,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef edgeStyle fill:#059669,stroke:#047857,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef outputStyle fill:#0F172A,stroke:#020617,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+
+    %% -------------------------------------------------------------------
+    %% ROW 1: Content-Adaptive Routing & Super-Resolution Preprocessing
+    %% -------------------------------------------------------------------
+    subgraph S1 ["Stage 1: Content-Adaptive Routing and Enhancement Pipeline"]
+        direction LR
+        IN["<b>Raw PCB Frame</b><br/>640×640 RGB<br/>Telecentric Industrial Imaging"]:::inputStyle
+        ARR["<b>Adaptive Resolution Router (ARR)</b><br/>• Spatial Edge Density (Canny)<br/>• Local Contrast Variance (Laplacian)<br/>• 2D FFT High-Frequency Energy"]:::routerStyle
+        BYPASS["<b>Direct Bypass Path</b><br/>Native Resolution (640×640)<br/><i>55.13% (Macro-Defect Frames)</i>"]:::routeOption
+        SR["<b>Super-Resolution Path (2×)</b><br/>SwinIR / FSRCNN Edge Model<br/><i>44.87% (Micro-Defect Frames)</i>"]:::routeOption
+        NORM["<b>Standardized Input Tensor</b><br/>640×640×3 (Normalized [0, 1])"]:::routeOption
+
+        IN --> ARR
+        ARR -->|"Macro / Low Complexity"| BYPASS
+        ARR -->|"Micro / High Complexity"| SR
+        BYPASS --> NORM
+        SR --> NORM
+    end
+
+    %% -------------------------------------------------------------------
+    %% ROW 2: Parallel Dual-Track Detection, Fusion & Edge Optimization
+    %% -------------------------------------------------------------------
+    subgraph S2 ["Stages 2 & 3: Parallel Dual-Track Detection, Fusion and Optimization Engine"]
+        direction LR
+        TRACK1["<b>Track 1: YOLO26n (CNN)</b><br/>• 2.57M Parameters | 3.9 ms GPU Latency<br/>• Local Texture & Rapid Boundary Extraction"]:::yoloStyle
+        TRACK2["<b>Track 2: RT-DETR-L (Transformer)</b><br/>• 32.0M Parameters | 28.0 ms GPU Latency<br/>• Global Multi-Scale Relational Attention"]:::detrStyle
+        
+        WBF["<b>Weighted Box Fusion (WBF)</b><br/>• Asymmetric Weights: DETR 1.5×, YOLO 1.0×<br/>• Resolves Ambiguity & Suppresses False Alarms<br/>• Peak Ensemble F1: 0.6493 | Recall: 86.63%"]:::fusionStyle
+        
+        OUT["<b>Final Defect Detections</b><br/>9 Classes (incl. FOD: CFO & BMFO)<br/>High-Confidence Fused Bounding Boxes"]:::outputStyle
+        
+        EDGE["<b>Edge Quantization & Compression</b><br/>• Dynamic INT8 Quantization (3.87× compression)<br/>• L1-Norm Structured Channel Pruning<br/>• Footprint: RT-DETR 32.4MB | YOLO 2.7MB"]:::edgeStyle
+
+        TRACK1 -->|"Boxes + Conf"| WBF
+        TRACK2 -->|"Boxes + Conf"| WBF
+        WBF --> OUT
+        
+        TRACK1 -.->|"Quantized / Pruned"| EDGE
+        TRACK2 -.->|"Quantized / Pruned"| EDGE
+    end
+
+    %% Inter-Row Connection (Ties Row 1 to Row 2)
+    NORM ==>|"Dual Dispatch"| TRACK1
+    NORM ==>|"Dual Dispatch"| TRACK2

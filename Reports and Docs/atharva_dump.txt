@@ -1,0 +1,275 @@
+Paragraphs: 122, Tables: 15
+
+P[0] (Heading 2): 3.8 Experimental Setup
+P[1] (Normal): This subsection describes how the experiments were configured so that the results in Section 4 can be reproduced. Figure 6 summarizes the workflow: the DsPCBSD+ images are partitioned into training, validation and test subsets; the two detectors are fine-tuned and the Adaptive Resolution Router (ARR) is calibrated; and the trained models are then evaluated, individually and after Weighted Box Fusion (WBF), on the held-out test subset, before and after compression.
+P[2] (Normal): 
+P[3] (Normal): Figure 6 | Experimental workflow. Top: data partitioning, detector fine-tuning, ARR calibration and compression. Bottom: test-time inference pipeline from the ARR gate through the two detectors and WBF to metric computation. Routing percentages are taken from Table 3.
+P[4] (Heading 3): 3.8.1 Dataset and Partitioning
+P[5] (Normal): All experiments used the DsPCBSD+ benchmark [21] described in Section 3.1: 10,259 RGB images of 640 × 640 pixels with 20,376 annotated boxes across nine defect classes (SH, SP, SC, OP, MB, HB, CS, CFO and BMFO). The images were divided into training, validation and test subsets in an approximately 70% / 20% / 10% ratio (Table 5). The training subset was used to fit both detectors, the validation subset for checkpoint selection and for calibrating the ARR thresholds (Section 3.2.2), and the test subset was held out for final evaluation. [[TBD: how the split was generated (random or stratified by class, random seed, whether it follows the official DsPCBSD+ split).]] [[TBD: confirm that the WBF parameters and the confidence threshold were selected on the validation subset and not on the test subset.]] The routing statistics of Tables 3 and 4 were computed over all 10,259 images because the ARR has no trainable parameters.
+P[6] (Normal): Table 5 | Partition of DsPCBSD+ used in the experiments.
+P[7] (Normal): Per-class instance counts in Tables 2 and 4 sum to 20,276; see Appendix A, item 5
+P[8] (Heading 3): 3.8.2 Hardware and Software Environment
+P[9] (Normal): Detector training and GPU latency measurements were performed on the computational resources of the School of Computer Science and Engineering, VIT. The compressed models were benchmarked on CPU. The platform and software stack are listed in Table 6.
+P[10] (Normal): Table 6 | Hardware and software environment.
+P[11] (Normal): 
+P[12] (Heading 3): 3.8.3 Detector Configuration and Training
+P[13] (Normal): Both detectors were fine-tuned on DsPCBSD+ at a fixed input resolution of 640 × 640 pixels with nine output classes. YOLO26n (Section 3.3) comprises approximately 2.51 M parameters and RT-DETR-L (Section 3.4) approximately 32.82 M parameters. [[TBD: initialization of each detector (COCO-pretrained or random) and weight source.]] The training hyper-parameters are listed in Table 7.
+P[14] (Normal): Table 7 | Training configuration of the two detectors.
+P[15] (Normal): 
+P[16] (Normal): The stochastic augmentation suite of Section 3.2.5 was applied during training (Table 8) and was disabled at validation and test time. [[TBD: whether identical augmentation settings were used for both detectors, and whether Mosaic was switched off in the final epochs.]] [[TBD: whether training images were taken from the direct route, the super-resolved route, or the routed mixture.]]
+P[17] (Normal): Table 8 | Data augmentation settings.
+P[18] (Normal): 
+P[19] (Heading 3): 3.8.4 Adaptive Resolution Router Configuration
+P[20] (Normal): The ARR was run in its unsupervised inference mode (Section 3.2.2-B). The perceptual features are the Canny edge density D_edge, the local contrast standard deviation σ_contrast and the high-frequency spectral energy ratio η_HF. The thresholds were calibrated on the validation subset (Table 9). A frame is routed to the super-resolution pathway when it satisfies the gating rule in Figure 4, (D_edge < τ_edge AND σ_contrast < τ_contrast) OR η_HF < τ_HF, and to the direct pathway otherwise. [[TBD: confirm this rule, because Eq. 16 is truncated in the current manuscript.]] The gate executes on the CPU in under 1.2 ms per frame.
+P[21] (Normal): Table 9 | Adaptive Resolution Router and super-resolution settings.
+P[22] (Normal): 
+P[23] (Heading 3): 3.8.5 Weighted Box Fusion Configuration
+P[24] (Normal): Predictions of YOLO26n and RT-DETR-L were fused with WBF [10] using the settings of Table 10. Only boxes of the same class are fused (Section 3.6). WBF has no trainable parameters, and neither detector was retrained for fusion.
+P[25] (Normal): Table 10 | Weighted Box Fusion settings.
+P[26] (Normal): 
+P[27] (Heading 3): 3.8.6 Compression Configuration
+P[28] (Normal): Compression followed Section 3.7 (Table 11). Each detector was pruned independently, exported to ONNX and quantized. Model sizes were measured on the serialized files and compared against the ONNX FP32 versions.
+P[29] (Normal): Table 11 | Compression settings.
+P[30] (Normal): 
+P[31] (Heading 3): 3.8.7 Inference and Timing Procedure
+P[32] (Normal): At inference, each image passes through the ARR, the selected preprocessing pathway, YOLO26n and RT-DETR-L, and WBF (Figure 6). [[TBD: batch size; whether the two detectors were run concurrently or sequentially in the timing experiments; number of warm-up iterations and timed repetitions; whether the 3.9 ms and 28.0 ms values are means or medians; whether the timings include pre-processing, post-processing and host–device transfer.]] GPU latency (YOLO26n and RT-DETR-L) and CPU latency (INT8 models) were measured separately. The routing-time comparison of Table 3 (about 396 s for blanket super-resolution versus about 180 s for adaptive routing over 10,259 images) was measured on [[TBD: hardware]]. Detection metrics were computed on the test subset as defined in Section 3.9.
+P[33] (Heading 2): 3.9 Evaluation Metrics
+P[34] (Normal): Two groups of metrics are used. Detection-quality metrics (IoU-based matching, precision, recall, F1-score and false-positive counts) assess correctness; efficiency metrics (latency, throughput, routing savings, model size, parameter count and compression ratio) assess computational cost. The notation below is used consistently in Sections 4 and 5.
+P[35] (Normal): 
+P[36] (Normal): Figure 7 | Detection evaluation protocol. Predictions are matched to ground-truth boxes by class and IoU; the resulting TP, FP and FN counts define precision, recall and F1-score. Efficiency metrics are computed separately.
+P[37] (Heading 3): 3.9.1 Intersection over Union
+P[38] (Normal): For a predicted box B_p and a ground-truth box B_g, the overlap is
+P[39] (Normal): 	IoU(B_p, B_g) = |B_p ∩ B_g| / |B_p ∪ B_g|	(19)
+P[40] (Normal): A prediction is a true positive (TP) when its class equals that of a still-unmatched ground-truth box and IoU ≥ τ_IoU; each ground-truth box can be matched once. An unmatched prediction is a false positive (FP) and an unmatched ground-truth box is a false negative (FN). [[TBD: value of τ_IoU used in evaluation; Section 3.6 uses 0.5 for fusion matching.]] IoU also serves as the matching criterion inside WBF. For PCB inspection, IoU ensures that a detection refers to the defect at the correct location on a trace or pad, which matters for repair and for separating adjacent defects.
+P[41] (Heading 3): 3.9.2 Precision, Recall and F1-score
+P[42] (Normal): 	P = TP / (TP + FP)	(20)
+P[43] (Normal): 	R = TP / (TP + FN)	(21)
+P[44] (Normal): 	F1 = 2PR / (P + R)	(22)
+P[45] (Normal): Precision is the fraction of reported detections that are real defects; its complement, 1 − P, is the false-alarm burden that translates into manual re-inspection workload and the pseudo-defect problem of conventional AOI (Section 1.2). Recall is the fraction of real defects that are found; 1 − R is the miss rate, the critical quantity for FOD and for open or short circuits, where an escaped defect may cause a field failure (Section 1.1). F1, the harmonic mean of P and R, summarizes the balance at one operating point and penalizes a large gap between the two, which makes it suitable for comparing a high-recall with a high-precision detector. All three are reported at the confidence threshold [[TBD]] and are therefore operating-point dependent. [[TBD: micro- or macro-averaging over classes; add mAP@50 / mAP@50–95 here only if Section 4 reports them.]]
+P[46] (Heading 3): 3.9.3 False Positives and False-Alarm Reduction
+P[47] (Normal): The absolute false-positive count FP is reported for YOLO26n, RT-DETR-L and the fused output. The reduction achieved by fusion relative to detector d and the corresponding recall change are
+P[48] (Normal): 	ΔFP_d = FP_d − FP_fused ,   ΔR_d = R_fused − R_d	(23)
+P[49] (Normal): A positive ΔFP together with ΔR ≥ 0 indicates that fusion removes erroneous detections without discarding true ones. [[TBD: define whether the '17 false alarms' reported in the Abstract are box-level FP counts or image-level false alarms, and the split on which they were counted.]]
+P[50] (Heading 3): 3.9.4 Accuracy
+P[51] (Normal): Classification accuracy, (TP + TN)/(TP + TN + FP + FN), was not used. In object detection the true negatives (background regions correctly left undetected) are not well defined, so precision, recall and F1-score are used instead.
+P[52] (Heading 3): 3.9.5 Latency and Throughput
+P[53] (Normal): For N timed runs the mean per-image latency is
+P[54] (Normal): 	T̄ = (1/N) Σ_{n=1..N} T_n	(24)
+P[55] (Normal): where T_n is the wall-clock time for image n in milliseconds. T̄_YOLO, T̄_DETR, T̄_SR and T̄_ARR denote the latency of YOLO26n, RT-DETR-L, the super-resolution stage and the routing gate, respectively. Throughput at batch size 1 is
+P[56] (Normal): 	FPS = 1000 / T̄	(25)
+P[57] (Normal): Latency indicates whether a frame can be processed within the cycle time of the line, whereas throughput indicates the sustainable frame rate. Both depend on hardware and measurement protocol and are therefore reported together with the platform (Section 3.8.2). [[TBD: confirm whether throughput is reported in Section 4 and for which model and hardware.]]
+P[58] (Heading 3): 3.9.6 Computational Savings of Adaptive Routing
+P[59] (Normal): Let N be the number of images, N_SR the number routed to super-resolution and N_dir = N − N_SR the number processed directly. The fraction of super-resolution invocations avoided is
+P[60] (Normal): 	S_route = N_dir / N = 1 − N_SR / N	(26)
+P[61] (Normal): and the average per-image latency saving relative to blanket super-resolution is
+P[62] (Normal): 	ΔT = T̄_all-SR − T̄_adaptive	(27)
+P[63] (Normal): with the relative reduction in total processing time given by ΔT / T̄_all-SR. S_route measures computation avoided on frames that do not require enhancement, while ΔT also includes the cost of the gate. The per-class routing rate, SR% = N_SR,c / N_c (Table 4), relates routing decisions to defect scale through the median area ratio ρ. These metrics matter in AOI because super-resolution is the most expensive preprocessing stage and its cost scales with the number of enhanced frames.
+P[64] (Heading 3): 3.9.7 Model Size, Parameter Count and Compression Ratio
+P[65] (Normal): The parameter count |Θ| is the number of learnable weights and is a proxy for memory and computation demand. The model size M is the serialized file size in MB. The compression ratio and the pruning sparsity are
+P[66] (Normal): 	CR = M_FP32 / M_INT8	(28)
+P[67] (Normal): 	κ = (number of zero-valued weights) / |Θ|	(29)
+P[68] (Normal): where M_FP32 is the ONNX FP32 file size and κ is the sparsity (30% target, Section 3.7.1; the symbol κ is used to avoid a clash with the area ratio ρ of Eq. 7). These quantities determine whether both detectors can be hosted together within the memory budget of an industrial PC or embedded accelerator (Section 2.4). Unstructured sparsity reduces the number of non-zero weights but does not by itself reduce the size of a dense file, so CR reflects quantization only.
+P[69] (Normal): Table 12 | Summary of the evaluation metrics.
+P[70] (Normal): 
+P[71] (Normal): 
+P[72] (Heading 1): 5. Discussion
+P[73] (Normal): This section interprets the results of Section 4. Statements are labelled according to their evidential status: what the experiments show, and what is a plausible technical explanation that the present experiments do not test directly. Numerical values are quoted from Sections 3 and 4 only where needed to support an argument.
+P[74] (Heading 2): 5.1 Why YOLO26n Behaves Differently from RT-DETR-L
+P[75] (Normal): The two detectors operate at different points of the precision–recall trade-off (Table D1, Figure D1a). YOLO26n is the more conservative detector, whereas RT-DETR-L recovers considerably more of the annotated defects at a markedly lower precision. Their F1-scores are close, which indicates that they differ not so much in overall balance as in where they place their errors: YOLO26n mainly errs by omission and RT-DETR-L mainly by over-detection. Relative to YOLO26n, RT-DETR-L finds about 32% more of the true defects (0.8663 / 0.6578) while about 22% fewer of its reported detections are correct (0.4924 / 0.6340).
+P[76] (Normal): 
+P[77] (Normal): Figure D1 | Operating-point behaviour of the two detectors and the fused system. (a) Precision, recall and F1-score of YOLO26n and RT-DETR-L (Section 3.4). (b) F1-score versus detector latency; the fused latency is the sequential sum of the two detector latencies and excludes WBF. The vertical axis in (b) is truncated to 0.615–0.655 and visually exaggerates the F1 differences, which are small in absolute terms.
+P[78] (Normal): Table D1 | Profile of the two detectors and the fused system (values from Sections 3.3–3.6; fused precision to be taken from Section 4).
+P[79] (Normal): 
+P[80] (Normal): Local versus global representation. A convolutional detector builds each prediction from local receptive fields that are progressively downsampled. For the multi-scale defects of DsPCBSD+ (median area ratios from 0.003 for SP to 0.062 for CS, Table 2) the finest structures are represented by few feature-map cells after strided downsampling, a limitation described in Section 1.3. A transformer detector relates every encoded location to every other through attention and decodes a fixed set of object queries without NMS (Section 3.4). It is therefore reasonable to attribute the higher recall of RT-DETR-L to its ability to use surrounding context, such as trace continuity around an open circuit or a bridge, to propose candidates that local evidence alone would not support. This explanation is consistent with, but not directly verified by, the aggregate recall values. [[S4: if per-class recall is reported, state which classes show the largest recall gap; Table 4 identifies SP and MB as the most micro-scale classes.]]
+P[81] (Normal): False positives. The lower precision of RT-DETR-L has two plausible sources. First, a query-based decoder emits a fixed number of predictions whose confidence is not constrained by NMS, so a given confidence threshold admits more low-evidence boxes. Second, contextual reasoning can propose defects where the surroundings merely resemble defect context, for example along irregular trace edges. Because precision and recall are measured at one confidence threshold, part of the observed gap reflects the operating point and the different confidence calibration of the two models, not only intrinsic capability. [[S4: if precision–recall curves or mAP are available, use them to separate these effects.]]
+P[82] (Normal): Cost. RT-DETR-L has about 13 times as many parameters as YOLO26n (32.82 M versus 2.51 M) and about 7 times its GPU latency (28.0 ms versus 3.9 ms). Its recall advantage is therefore bought at a substantially higher computational price, which motivates its use as a second, complementary track rather than as a replacement (Section 5.3).
+P[83] (Heading 2): 5.2 Why Fusion Helps
+P[84] (Normal): The fused output keeps the recall of RT-DETR-L (0.8663), attains the highest F1-score of the three configurations (0.6493, versus 0.6457 for YOLO26n and 0.6279 for RT-DETR-L), and removes false positives present in the transformer output. Because the two detectors have almost equal F1-scores but very different precision–recall profiles, their errors are largely different, which is the condition under which ensembling is expected to help.
+P[85] (Normal): 
+P[86] (Normal): Figure D2 | Treatment of agreeing and isolated detections by WBF. Boxes found by both detectors are fused and reinforced; boxes found by only one detector keep a reduced confidence, so isolated low-evidence boxes are more likely to be removed by the output threshold while strong isolated boxes survive. This is the mechanism by which recall can be preserved while false positives are reduced.
+P[87] (Normal): Mechanism. WBF does not discard overlapping boxes. It averages the coordinates of same-class boxes with IoU ≥ 0.5, weighted by w_i·c_i (Section 3.6), and, as described in [10], lowers the confidence of fused boxes that are supported by fewer models than the ensemble size. A detection proposed by both detectors is thus reinforced and its coordinates are refined by two independent estimates, whereas a detection proposed by only one detector keeps a reduced confidence and is more likely to fall below the output threshold. This is consistent with the observation that false positives of RT-DETR-L were removed without any loss of recall: true defects found only by RT-DETR-L must have retained sufficient confidence, while a subset of its isolated low-evidence boxes did not. [[S4: number of fused boxes supported by both detectors versus one detector, if reported.]]
+P[88] (Normal): Asymmetric weighting. Setting w_DETR = 1.5 and w_YOLO = 1.0 gives the higher-recall detector more influence over box coordinates and confidence, so that its true detections are not suppressed when YOLO26n has no counterpart. The weighting was motivated by the validation recall of RT-DETR-L (Section 3.6). [[S4/TBD: report a weight sensitivity or ablation (e.g., 1:1, 1:2, NMS baseline) if available; otherwise state that the 1.5 : 1.0 ratio was not exhaustively optimized.]]
+P[89] (Normal): Table D2 | Differences of the fused system with respect to each detector.
+P[90] (Normal): 
+P[91] (Normal): Scope of the gain. The improvement should be read carefully. Relative to RT-DETR-L, fusion improves F1 by 0.0214 and improves precision. Relative to YOLO26n, the F1 gain is small (+0.0036) while the recall gain is large (+0.2085). The principal benefit of the dual-track system is therefore not a higher F1-score than the lightweight detector, but the ability to keep the transformer's recall at a higher precision than the transformer alone. The fused precision is not stated in the present manuscript; from F1 = 0.6493 and R = 0.8663 it follows that it is approximately 0.519 (derived). Claims about localization quality (tighter boxes from coordinate averaging) are a plausible expectation of WBF, but they are supported only if Section 4 reports IoU-sensitive metrics. [[S4: mean IoU or mAP@50–95, if available.]]
+P[92] (Heading 2): 5.3 Accuracy vs. Computational Cost
+P[93] (Normal): Detector cost. RT-DETR-L dominates the cost of the dual-track engine: at 28.0 ms against 3.9 ms for YOLO26n, it accounts for about 88% of the combined 31.9 ms if the detectors run sequentially (Figure D3b). If they run concurrently, as in Figure 1, the detector stage is bounded by the slower track (about 28 ms) plus the WBF cost. [[S4/TBD: measured WBF time per image and whether concurrent execution was benchmarked.]] Relative to RT-DETR-L alone, adding YOLO26n and WBF costs a small increment, and returns a higher F1-score and fewer false positives at identical recall. Relative to YOLO26n alone, the fused system costs roughly seven to eight times the detector time in return for about 21 percentage points of additional recall. Whether this is justified depends on the cost of an escaped defect against the cost of extra computation: for FOD and open or short circuits, where a miss can cause field failure (Section 1.1), the recall gain is likely to be valuable, whereas for less critical defect types the YOLO26n track alone may suffice.
+P[94] (Normal): 
+P[95] (Normal): Figure D3 | Capacity and per-stage cost. (a) Parameter counts of the two detectors. (b) Per-stage latency. The ARR bar is an upper bound (< 1.2 ms), and the super-resolution bar is derived from Table 3 as 396 s / 10,259 images ≈ 38.6 ms of average cost for blanket super-resolution; the backend that produced this figure should be stated [[TBD]].
+P[96] (Normal): Adaptive routing. The ARR targets the largest avoidable cost. Super-resolution is skipped for 55.13% of the frames (5,656 of 10,259), reducing the processing time of the dataset from about 396 s to about 180 s (Table 3, Figure D4a), a saving reported as 22.1 ms per image. The gate takes under 1.2 ms, about 5% of that saving, so its overhead is small relative to its benefit. The saving exceeds the entire YOLO26n latency by a factor of about 5.7. Table 4 shows that routing follows defect scale: 87.67% of SP and 76.95% of MB instances are routed to super-resolution against 12.70% of HB (Figure D4b). [[S4: Section 4 should show whether detection performance after adaptive routing is comparable to blanket super-resolution and to direct-only processing. This ablation is what supports the claim that skipping super-resolution for 55.13% of frames does not cost accuracy; without it, the savings are a computational result and not an accuracy-neutral one.]]
+P[97] (Normal): 
+P[98] (Normal): Figure D4 | Computational saving of adaptive routing and its relation to defect scale. (a) Total processing time for the 10,259 images (Table 3). (b) Share of instances sent to the super-resolution route per class (Table 4); bar colour encodes the median area ratio ρ of the class (Table 2).
+P[99] (Normal): Table D3 | Cost components used in the discussion.
+P[100] (Normal): 
+P[101] (Normal): Compression. Dynamic INT8 quantization reduces storage by 3.41× (YOLO26n, 2.74 MB) and 3.87× (RT-DETR-L, 32.45 MB), so the combined weight footprint is about 35 MB (derived). This lowers memory and bandwidth demand. Unstructured 30% pruning, by contrast, does not reduce dense file size, and does not necessarily reduce latency on dense kernels, so its practical value depends on sparse-aware runtimes. [[S4: report the accuracy and CPU-latency changes after pruning and INT8 (Sections 4.4–4.5) and comment on the observed trade-off.]]
+P[102] (Normal): Overall, under the evaluated conditions, the additional computation is justified mainly by the recall that the transformer track contributes and by the content-driven spending of the super-resolution budget, and less by a large gain in F1-score.
+P[103] (Heading 2): 5.4 Deployment Implications
+P[104] (Normal): 
+P[105] (Normal): Figure D5 | Candidate deployment architecture. Frames pass through the ARR gate, are routed to the direct or super-resolution path, are standardized to 640 × 640, are processed by the two INT8 detectors and fused by WBF. The dashed boxes list issues that were not evaluated in this study.
+P[106] (Normal): Latency and throughput. A 28.0 ms GPU latency for the slower track corresponds, as an upper bound that ignores all other stages, to about 35 frames per second (1000 / 28.0, derived). Frames routed to super-resolution incur additional preprocessing; Table 3 implies about 38.6 ms per image for blanket super-resolution (derived), so the per-frame latency depends on the route and a production line should be dimensioned for the super-resolution route and not for the mean. These estimates are indicative only and do not establish real-time performance on a specific line without end-to-end measurement. [[S4/TBD: end-to-end pipeline latency on GPU and CPU, and the target line rate.]]
+P[107] (Normal): Memory and edge hardware. With INT8 sizes of 2.74 MB and 32.45 MB, the weights of both detectors fit comfortably within the 4–8 GB of VRAM of the edge platforms discussed in Section 2.4. Activation memory of the transformer and of the super-resolution model during inference was not characterized. [[TBD: peak GPU/CPU memory if measured.]] No embedded accelerator (for example, a Jetson-class device) was benchmarked in this study [[TBD: confirm]], so edge feasibility is supported by model size and CPU benchmarks, not demonstrated on target hardware.
+P[108] (Normal): Reliability. The fused recall of 0.8663 implies that about 13% of annotated defects are still missed, and the implied precision of about 0.52 (derived) implies that about half of the reported detections are false alarms. In its present form the system is therefore better suited to a high-sensitivity screening stage with operator or secondary verification than to a fully autonomous accept/reject decision. The same applies to the FOD classes (CFO, BMFO), whose per-class recall should be checked against the line's escape-rate requirement. [[S4: per-class recall for CFO and BMFO.]]
+P[109] (Normal): Practical configuration. Because the tracks are decoupled, an operator can select YOLO26n alone (lowest latency, higher precision), the full fusion (highest recall), or, as an option that was not evaluated here, the transformer only on frames where YOLO26n is uncertain. The ARR thresholds are explicit parameters that can be recalibrated to a line's illumination and board type.
+P[110] (Normal): Table D4 | Deployment requirements, supporting evidence and remaining gaps.
+P[111] (Normal): 
+P[112] (Heading 2): 5.5 Comparison with Previous Studies
+P[113] (Normal): Comparisons with Table 1 must be made with care because the studies differ in dataset, number of classes, evaluation metric and hardware. We therefore separate the comparison into four categories (Table D6) and list the compared works in Table D5.
+P[114] (Normal): Table D5 | Compared studies (adapted from Table 1; the metric of the proposed work differs from the others).
+P[115] (Normal): 
+P[116] (Normal): Table D6 | Categories of comparison with previous studies.
+P[117] (Normal): 
+P[118] (Heading 2): 5.6 Limitations
+P[119] (Normal): The study has the following limitations. Each affects how the results should be interpreted and points to a concrete direction for future work (Table D7).
+P[120] (Normal): Table D7 | Limitations, their effect on interpretation and suggested follow-up.
+P[121] (Normal): 
+
+--- TABLE 0 (5x5) ---
+Subset | Images | Share | Defect instances | Role
+Training | 7,181 | 70.0% | ~14,260 | Detector fine-tuning
+Validation | 2,052 | 20.0% | ~4,075 | Checkpoint selection, ARR calibration
+Test | 1,026 | 10.0% | ~2,041 | Final evaluation (held out)
+Total | 10,259 | 100% | 20,376* | -
+
+--- TABLE 1 (11x2) ---
+Item | Specification
+GPU (training and GPU latency) | [[TBD: model, VRAM, driver]]
+CPU / RAM (host) | [[TBD: model, cores, RAM]]
+CPU used for INT8 benchmarking | [[TBD: model, cores/threads, threading setting]]
+Operating system | [[TBD]]
+Python / PyTorch / CUDA / cuDNN | [[TBD: versions]]
+Detector framework (YOLO26n, RT-DETR-L) | [[TBD: Ultralytics or other, version]]
+Image processing (Canny, FFT, resizing) | [[TBD: OpenCV / NumPy versions]]
+Super-resolution implementation | [[TBD: SwinIR-light checkpoint and source]]
+WBF implementation | [[TBD: library and version]]
+Export / quantization runtime | [[TBD: ONNX opset, ONNX Runtime version]]
+
+--- TABLE 2 (11x3) ---
+Parameter | YOLO26n | RT-DETR-L
+Input size | 640 × 640 | 640 × 640
+Number of classes | 9 | 9
+Epochs | [[TBD]] | [[TBD]]
+Batch size | [[TBD]] | [[TBD]]
+Optimizer | [[TBD]] | [[TBD]]
+Initial / final learning rate | [[TBD]] | [[TBD]]
+Scheduler and warm-up | [[TBD]] | [[TBD]]
+Weight decay / momentum | [[TBD]] | [[TBD]]
+Checkpoint / early-stopping criterion | [[TBD]] | [[TBD]]
+Random seed | [[TBD]] | [[TBD]]
+
+--- TABLE 3 (6x2) ---
+Augmentation | Setting
+Mosaic | p = 1.0
+MixUp | p = 0.15; λ ~ Beta(0.5, 0.5) (Eq. 18)
+Random flips | Horizontal and vertical, p = 0.5
+Geometric affine | Rotation, isotropic scaling, translation [[TBD: ranges]]
+HSV colour jitter | [[TBD: hue / saturation / value gains]]
+
+--- TABLE 4 (12x2) ---
+Parameter | Value
+Canny hysteresis thresholds (T_low, T_high) | 50, 150 (Eq. 10)
+Edge-density threshold τ_edge | 0.030
+Contrast-variance threshold τ_contrast | 25.0
+High-frequency energy threshold τ_HF | 0.700
+Gaussian blur for I_blur (Eq. 12) | [[TBD: kernel size / σ]]
+Low-frequency region Ω_low (Eq. 15) | [[TBD: definition / radius]]
+Gate execution time | < 1.2 ms per frame, CPU
+Resulting routing (10,259 images) | 5,656 direct (55.13%); 4,603 super-resolution (44.87%)
+Super-resolution backend | [[TBD: SwinIR-light per Section 3.5, or another backend of Section 3.2.3]]
+Super-resolution scale | 2× (640 × 640 → 1280 × 1280), then anti-aliased area averaging back to 640 × 640
+Unsharp-masking parameters α, σ (Eq. 17) | [[TBD: only if this backend was used]]
+
+--- TABLE 5 (7x2) ---
+Parameter | Value
+Model weights (w_YOLO, w_DETR) | 1.0, 1.5
+IoU matching threshold | 0.5
+Pre-fusion confidence threshold (each detector) | [[TBD]]
+Skip-box threshold | [[TBD]]
+Confidence aggregation mode | [[TBD: e.g., average / max]]
+Post-fusion confidence threshold used for P, R, F1 | [[TBD]]
+
+--- TABLE 6 (8x2) ---
+Parameter | Value
+Pruning method | L1-unstructured (magnitude) pruning
+Target sparsity | 30%
+Pruning scope (global or per-layer) / fine-tuning after pruning | [[TBD]]
+Export format | ONNX [[TBD: opset]]
+Quantization | Post-training dynamic INT8 (weights stored as 8-bit integers, no calibration dataset)
+Quantized sizes | YOLO26n 2.74 MB (3.41×); RT-DETR-L 32.45 MB (3.87×) relative to ONNX FP32
+Benchmark platform | CPU [[TBD: model and threading]]
+
+--- TABLE 7 (9x4) ---
+Metric | Eq. | Measures | Relevance to PCB / FOD inspection
+IoU | 19 | Box overlap, matching criterion | Correct localization on traces and pads
+Precision | 20 | Share of detections that are real | False-alarm / re-inspection burden
+Recall | 21 | Share of real defects found | Escaped-defect risk, especially FOD and open/short
+F1-score | 22 | Balance of P and R | Single operating-point comparison
+ΔFP, ΔR | 23 | Fusion effect on false alarms / misses | Verifies false-alarm removal without recall loss
+Latency T̄, FPS | 24, 25 | Time per frame, sustainable rate | Line cycle-time budget
+S_route, ΔT | 26, 27 | Super-resolution avoided, time saved | Compute spent only where needed
+|Θ|, M, CR, κ | 28, 29 | Capacity, storage, compression | Memory limits of edge hardware
+
+--- TABLE 8 (4x6) ---
+Configuration | Precision | Recall | F1 | Parameters | GPU latency
+YOLO26n | 0.6340 | 0.6578 | 0.6457 | 2.51 M | 3.9 ms
+RT-DETR-L | 0.4924 | 0.8663 | 0.6279 | 32.82 M | 28.0 ms
+WBF fusion | [[S4: value]]; ≈ 0.519 (derived) | 0.8663 | 0.6493 | none added | [[S4/TBD]]
+
+--- TABLE 9 (5x3) ---
+Quantity | vs. YOLO26n | vs. RT-DETR-L
+Recall change | +0.2085 | 0.0000 (no recall loss)
+F1 change | +0.0036 | +0.0214
+Precision change | [[S4]] | [[S4]]; positive
+False-positive change | [[S4]] | −17 reported in Abstract [[TBD: see Appendix A, item 1]]
+
+--- TABLE 10 (9x3) ---
+Component | Value | Source / status
+YOLO26n GPU latency | 3.9 ms | Section 3.3
+RT-DETR-L GPU latency | 28.0 ms | Section 3.4
+Sequential detector sum | 31.9 ms | Derived (3.9 + 28.0)
+ARR gate | < 1.2 ms (CPU) | Section 3.2.2
+Blanket SR, whole dataset | ~396 s (≈ 38.6 ms / image) | Table 3; per-image value derived
+Adaptive routing, whole dataset | ~180 s (≈ 17.5 ms / image) | Table 3; per-image value derived
+Saving per image | 22.1 ms reported | Table 3 gives ≈ 21.1 ms (derived); see Appendix A, item 6
+Compressed sizes | 2.74 MB / 32.45 MB | Section 3.7.2 (3.41× / 3.87×)
+
+--- TABLE 11 (6x3) ---
+Requirement | Evidence from this study | Gap / next step
+Cycle time | YOLO26n 3.9 ms; RT-DETR-L 28.0 ms (GPU); gate < 1.2 ms | End-to-end and per-route latency on target line hardware [[S4/TBD]]
+Memory | INT8 sizes 2.74 MB and 32.45 MB | Peak activation memory [[TBD]]
+Edge compute | CPU benchmark of INT8 models [[S4]] | Embedded accelerator not tested
+Detection reliability | Recall 0.8663 for fusion; precision ≈ 0.52 (derived) | Per-class recall for FOD; verification stage
+Adaptivity | 55.13% of frames bypass super-resolution | Threshold recalibration for other boards or lighting
+
+--- TABLE 12 (12x6) ---
+Study | Base model | Dataset (classes) | Reported metric | Fusion / adaptive input | Compression / edge
+Ye et al. [1] (2026) | YOLOv11s | DsPCBSD+ / DeepPCB (6–9) | mAP@50 94.2% | None / static 640 | Pruning, no INT8
+Li et al. [2] (2025) | SCF-YOLO | PKU-PCB (6) | mAP@50 95.8% | None / static 640 | KD, theoretical FLOPs
+Kong et al. [3] (2025) | GESC-YOLO | Custom PCB (6) | mAP@50 99.0% | None / static 640 | No edge deployment
+Chu et al. [4] (2025) | YOLOv8n | PKU-Market-PCB (6) | mAP@50 96.7% | None / static 640 | Pruning on PC GPU
+Yin et al. [5] (2025) | MAS-YOLO (v12) | DeepPCB / PKU-PCB (6) | mAP@50 96.1% | None / static 640 | No quantization
+Selvam et al. [6] (2025) | YOLO-DefXpert | HRIPCB (6) | mAP@50 99.0% | None / static 1024 | High latency (> 45 ms)
+Chen & Liu [7] (2025) | YOLOv12 | PKU-PCB / DeepPCB (6) | mAP@50 90.4% | None / static 640 | None
+Chen et al. [8] (2025) | MS-YOLO (v10) | DeepPCB / PKU-PCB (6) | mAP@50 98.9% | None / static 640 | Distillation only
+Niaz et al. [20] (2025) | ViT-Mamba | Custom PCB (6) | mAP@50 99.69% | Single hybrid / uniform | > 70 ms
+Niu et al. [23] (2025) | LPDETR | PCB benchmark (6) | mAP@50 93.4% | None / uniform | RTX 3090 only
+Proposed work | YOLO26n + RT-DETR-L | DsPCBSD+ (9, incl. FOD) | Recall 86.6%, F1 0.6493 | WBF / ARR (55.13% bypass) | Pruning + dynamic INT8 (2.74 MB)
+
+--- TABLE 13 (6x2) ---
+Category | Assessment
+Direct numerical comparison | Limited. The cited works report mAP@50 (90.4%–99.69%), whereas this study reports precision, recall and F1-score at an operating point. These quantities cannot be ranked against each other. The only study sharing the dataset, Ye et al. [1], used a different class set and evaluation protocol according to Table 1. [[S4: if mAP@50 is computed for the proposed system, add it as the only like-for-like number.]]
+Dataset effects | Most cited studies use six-class datasets (DeepPCB, PKU-PCB, HRIPCB, custom sets). DsPCBSD+ contains nine classes including FOD, a 5:1 imbalance between the most (SP, 4,584) and least frequent (SH, 915) classes, and many defects below 0.5% of the image area (Table 2). Li et al. [2] report degraded accuracy on particulate debris, consistent with the difficulty of the FOD classes here. The same detector can therefore score much lower on such a benchmark.
+Architectural differences | All studies in Table 1 use a single model with static preprocessing. Niaz et al. [20] and Selvam et al. [6] place transformer components inside one network, and Niu et al. [23] a single lightweight RT-DETR. The present framework differs by content-adaptive resolution handling, late fusion of two independent detector families (WBF [10]) and combined pruning and INT8 quantization. These are architectural distinctions, not accuracy claims.
+Computational and deployment | Table 1 reports > 45 ms [6] and > 70 ms [20] for transformer-containing models, and pruning or distillation without INT8 in [1], [4] and [8]. The RT-DETR-L track (28.0 ms) and the INT8 sizes are in a comparable or lower range, but latencies were obtained on different hardware and cannot be ranked directly [[TBD: GPU of this work]]. The Table 1 entry 'Full INT8 quantization' should read 'dynamic INT8 post-training quantization', as in Section 3.7.2.
+Qualitative differences | This study reports system-level properties (routing statistics, fusion behaviour, compression) that single-model studies do not address, notably the share of frames that can skip super-resolution. It does not show that these properties yield higher accuracy than the cited detectors. The absolute F1-score of 0.6493 should be regarded as a baseline on a nine-class benchmark.
+
+--- TABLE 14 (10x3) ---
+Limitation | Effect on interpretation | Future work
+Single dataset and imaging setup | All results come from DsPCBSD+, acquired with one telecentric optical system. Generalization to other boards, cameras and lighting is untested. | Cross-dataset validation (e.g., DeepPCB, PKU-PCB)
+Hand-set routing thresholds | τ_edge = 0.030, τ_contrast = 25.0 and τ_HF = 0.700 were calibrated on this dataset; routing is correlated with defect scale but not perfectly (28.31% of CS and 12.70% of HB instances still go to super-resolution). Sensitivity [[S4/TBD: assessed / not assessed]]. | Learned or auto-calibrated router; threshold sensitivity study
+Super-resolution overhead | About 45% of frames still pay a super-resolution cost that averages about 38.6 ms (derived), above the YOLO26n latency. Accuracy benefit of super-resolution versus direct processing is not isolated. | Direct / all-SR / adaptive ablation; lighter SR backends
+Pipeline complexity | Router, SR network, two detectors and WBF each add parameters (thresholds, weights, IoU). The WBF ratio and confidence threshold were [[TBD: tuned on validation / not exhaustively optimized]]; selection on the test set would give an optimistic F1. | Weight and threshold sensitivity; single-run variance
+Hardware dependence | Latencies were measured on [[TBD: GPU]] and do not transfer to embedded platforms. No in-line or on-device benchmark is reported. | Benchmark on Jetson-class and industrial-PC hardware
+Compression trade-offs | Dynamic INT8 quantization is weight-oriented with no calibration, and unstructured 30% pruning leaves dense file size unchanged. Effects on accuracy: [[S4: Section 4.4]]. | Structured pruning; INT8 calibration; sparse runtimes
+Operating-point metrics, modest precision | P, R and F1 describe one threshold; implied fused precision ≈ 0.52 (derived). No claim of superiority over previous detectors is made (Section 5.5). | Report mAP and precision–recall curves
+Class imbalance and defect sensitivity | SP outnumbers SH by about 5:1, and classes with small area (SP, MB, BMFO) are the most affected by resolution handling and probably the most error-prone. [[S4: per-class results.]] | Class-balanced training; per-class threshold tuning
+Limited real-world validation | No in-line production test, long-run thermal behaviour or operator-workload study was conducted. | Pilot deployment on a production line

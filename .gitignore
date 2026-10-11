@@ -1,0 +1,54 @@
+# Node / Next.js
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+build/
+.npm/
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Machine Learning, Datasets & Heavy Binaries
+MODEL RESULTS/
+*.onnx
+*.weights
+[Dd]ataset/
+**/[Dd]ataset/
+Data Preprocessing/Classified_Dataset/
+Data Preprocessing/Processed_*/
+Processed_*/
+images/
+local_storage/
+backend/local_storage/
+
+# Compressed Archives (>100MB files that GitHub rejects)
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+
+# Scratch & Personal workspace
+scratch/
+ai_workplace/scratch/
+*.aux
+*.log
+*.out
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

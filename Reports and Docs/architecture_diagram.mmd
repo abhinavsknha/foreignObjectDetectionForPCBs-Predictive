@@ -1,0 +1,55 @@
+flowchart LR
+    %% Styles
+    classDef inputStyle fill:#1E293B,stroke:#0F172A,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef routerStyle fill:#2563EB,stroke:#1D4ED8,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef routeOption fill:#F8FAFC,stroke:#94A3B8,stroke-width:2px,color:#0F172A,rx:6px,ry:6px;
+    classDef yoloStyle fill:#EA580C,stroke:#C2410C,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef detrStyle fill:#7C3AED,stroke:#6D28D9,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef fusionStyle fill:#DC2626,stroke:#B91C1C,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef edgeStyle fill:#059669,stroke:#047857,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+    classDef outputStyle fill:#0F172A,stroke:#020617,stroke-width:2px,color:#FFFFFF,rx:8px,ry:8px;
+
+    %% 1. Input
+    IN["<b>Raw PCB Frame</b><br/>640x640 RGB<br/>Telecentric Imaging"]:::inputStyle
+
+    %% 2. Stage 1: Preprocessing & Routing
+    subgraph S1 ["Stage 1: Content-Adaptive Routing and Enhancement"]
+        ARR["<b>Adaptive Resolution Router (ARR)</b><br/>- Spatial Edge Density (Canny)<br/>- Local Contrast Variance<br/>- 2D FFT Spectral Energy"]:::routerStyle
+        SR["<b>Super-Resolution Path (2x)</b><br/>SwinIR / FSRCNN / Bicubic<br/><i>44.87% (Micro-Defects)</i>"]:::routeOption
+        BYPASS["<b>Direct Bypass Path</b><br/>Native Resolution (640x640)<br/><i>55.13% (Macro-Defects)</i>"]:::routeOption
+        NORM["<b>Standardized Input Tensor</b><br/>640x640x3 (Normalized)"]:::routeOption
+    end
+
+    %% 3. Stage 2: Dual-Track Detection
+    subgraph S2 ["Stage 2: Parallel Dual-Track Detection Engine"]
+        TRACK1["<b>Track 1: YOLO26n (CNN)</b><br/>- 2.57M Parameters<br/>- 3.9 ms Latency (GPU)<br/>- Macro & Boundary Extraction"]:::yoloStyle
+        TRACK2["<b>Track 2: RT-DETR-L (Transformer)</b><br/>- 32M Parameters<br/>- 28.0 ms Latency (GPU)<br/>- Global Relational Context"]:::detrStyle
+    end
+
+    %% 4. Stage 3: Fusion & Output
+    subgraph S3 ["Stage 3: Decision Fusion & Deployment"]
+        WBF["<b>Weighted Box Fusion (WBF)</b><br/>- Asymmetric Weighting (DETR 1.5x, YOLO 1.0x)<br/>- Eliminates 17 False Alarms<br/>- Peak F1: 0.6493 | 86.63% Recall"]:::fusionStyle
+        OUT["<b>Final Defect Predictions</b><br/>9 Classes (incl. FOD: CFO & BMFO)<br/>Bounding Boxes + Confidence"]:::outputStyle
+    end
+
+    %% Edge Compression Subgraph
+    subgraph S4 ["Edge Optimization Engine"]
+        EDGE["<b>Edge Quantization & Compression</b><br/>- Dynamic INT8 Post-Training Quantization<br/>- L1-Norm Structured Channel Pruning<br/>- 3.87x Size Reduction (RT-DETR to 32.4MB, YOLO to 2.7MB)"]:::edgeStyle
+    end
+
+    %% Connections
+    IN --> ARR
+    ARR -->|"Micro-Defect / High Complexity"| SR
+    ARR -->|"Macro-Defect / Low Complexity"| BYPASS
+    SR --> NORM
+    BYPASS --> NORM
+    
+    NORM --> TRACK1
+    NORM --> TRACK2
+
+    TRACK1 --> WBF
+    TRACK2 --> WBF
+    WBF --> OUT
+
+    TRACK1 -.-> EDGE
+    TRACK2 -.-> EDGE

@@ -1,0 +1,9 @@
+architecture,variant,format,size_mb,params,param_reduction_pct,latency_ms,fps,compression_ratio
+YOLO26n (CNN),Baseline PyTorch,PT FP32,14.85,2507310,0.0,3.9,256.4,1.0
+YOLO26n (CNN),Baseline ONNX,ONNX FP32,9.36,2507310,0.0,36.36,27.5,1.59
+YOLO26n (CNN),Dynamic Quantized,ONNX INT8,2.74,2507310,0.0,60.78,16.5,3.41
+YOLO,Pruned L1 (20%),PyTorch Sparse,12.63,2009664,19.85,,,1.25
+YOLO,Pruned L1 (30%),PyTorch Sparse,11.51,1760836,29.77,,,1.42
+RT-DETR-L (Transformer),Baseline PyTorch,PT FP32,63.18,32824571,0.0,28.0,35.7,1.0
+RT-DETR-L (Transformer),Baseline ONNX,ONNX FP32,125.43,32824571,0.0,589.88,1.7,0.5
+RT-DETR-L (Transformer),Dynamic Quantized,ONNX INT8,32.45,32824571,0.0,595.78,1.7,3.87
