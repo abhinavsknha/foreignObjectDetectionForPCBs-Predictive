@@ -15,6 +15,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
   const [status, setStatus] = useState<"idle" | "uploading" | "processing">("idle");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [fileKey, setFileKey] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -31,7 +32,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
           
           if (data.status === "completed") {
             clearInterval(interval);
-            onInferenceComplete(fileKey!, data.result.results);
+            onInferenceComplete(previewUrl || fileKey!, data.result.results);
           }
         } catch (e) {
           console.error(e);
@@ -40,9 +41,11 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
     }
     
     return () => clearInterval(interval);
-  }, [status, taskId, fileKey, onInferenceComplete]);
+  }, [status, taskId, fileKey, previewUrl, onInferenceComplete]);
 
   const uploadFile = async (selectedFile: File) => {
+    const localBlob = URL.createObjectURL(selectedFile);
+    setPreviewUrl(localBlob);
     setStatus("uploading");
     
     try {
