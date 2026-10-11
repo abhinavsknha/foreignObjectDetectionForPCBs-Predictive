@@ -38,7 +38,10 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const imageUrl = `http://localhost:8000/${fileKey}`;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const imageUrl = fileKey.startsWith("blob:") || fileKey.startsWith("data:") || fileKey.startsWith("http")
+      ? fileKey
+      : `${apiBase}/${fileKey}`;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = imageUrl;
