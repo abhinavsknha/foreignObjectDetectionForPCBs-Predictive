@@ -9,11 +9,25 @@ from . import models
 # ML Imports
 from ultralytics import YOLO, RTDETR
 
+import ssl
+
 load_dotenv()
 
 # Setup Celery
 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# Handle encrypted cloud Redis (Upstash) which requires ssl_cert_reqs parameter
+if redis_url.startswith("rediss://") and "ssl_cert_reqs" not in redis_url:
+    delimiter = "&" if "?" in redis_url else "?"
+    redis_url = f"{redis_url}{delimiter}ssl_cert_reqs=CERT_NONE"
+
 celery_app = Celery("pcb_tasks", broker=redis_url, backend=redis_url)
+
+if redis_url.startswith("rediss://"):
+    celery_app.conf.update(
+        broker_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
+        redis_backend_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
