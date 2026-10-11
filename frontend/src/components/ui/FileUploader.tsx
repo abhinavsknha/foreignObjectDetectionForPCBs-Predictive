@@ -22,7 +22,11 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
     if (status === "processing" && taskId) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/inference/status/${taskId}`);
+          const res = await fetch(`${API_BASE}/api/inference/status/${taskId}`, {
+            headers: {
+              "bypass-tunnel-reminder": "true",
+            },
+          });
           const data = await res.json();
           
           if (data.status === "completed") {
@@ -47,6 +51,9 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
       
       const uploadRes = await fetch(`${API_BASE}/api/upload/local`, {
         method: "POST",
+        headers: {
+          "bypass-tunnel-reminder": "true",
+        },
         body: formData,
       });
       if (!uploadRes.ok) throw new Error("Upload failed");
@@ -54,6 +61,9 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
       
       const inferRes = await fetch(`${API_BASE}/api/inference/trigger?file_key=${encodeURIComponent(uploadData.file_key)}`, {
         method: "POST",
+        headers: {
+          "bypass-tunnel-reminder": "true",
+        },
       });
       if (!inferRes.ok) throw new Error("Inference trigger failed");
       const inferData = await inferRes.json();
