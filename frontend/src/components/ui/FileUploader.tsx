@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { UploadCloud, CheckCircle, Loader2 } from "lucide-react";
+import { UploadCloud, Loader2, Image as ImageIcon } from "lucide-react";
 
 interface FileUploaderProps {
   onInferenceComplete: (fileKey: string, results: any) => void;
@@ -19,7 +19,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    
+
     if (status === "processing" && taskId) {
       interval = setInterval(async () => {
         try {
@@ -29,7 +29,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
             },
           });
           const data = await res.json();
-          
+
           if (data.status === "completed") {
             clearInterval(interval);
             onInferenceComplete(previewUrl || fileKey!, data.result.results);
@@ -39,7 +39,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
         }
       }, 1000);
     }
-    
+
     return () => clearInterval(interval);
   }, [status, taskId, fileKey, previewUrl, onInferenceComplete]);
 
@@ -47,11 +47,11 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
     const localBlob = URL.createObjectURL(selectedFile);
     setPreviewUrl(localBlob);
     setStatus("uploading");
-    
+
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      
+
       const uploadRes = await fetch(`${API_BASE}/api/upload/local`, {
         method: "POST",
         headers: {
@@ -61,13 +61,16 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
       });
       if (!uploadRes.ok) throw new Error("Upload failed");
       const uploadData = await uploadRes.json();
-      
-      const inferRes = await fetch(`${API_BASE}/api/inference/trigger?file_key=${encodeURIComponent(uploadData.file_key)}`, {
-        method: "POST",
-        headers: {
-          "bypass-tunnel-reminder": "true",
-        },
-      });
+
+      const inferRes = await fetch(
+        `${API_BASE}/api/inference/trigger?file_key=${encodeURIComponent(uploadData.file_key)}`,
+        {
+          method: "POST",
+          headers: {
+            "bypass-tunnel-reminder": "true",
+          },
+        }
+      );
       if (!inferRes.ok) throw new Error("Inference trigger failed");
       const inferData = await inferRes.json();
 
@@ -75,10 +78,10 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
       setTaskId(inferData.task_id);
       setStatus("processing");
     } catch (error) {
-      console.warn("Backend offline or unreachable, switching to client demo mode", error);
+      console.warn("Backend unreachable, activating client demo fallback", error);
       setStatus("processing");
-      
-      // Fallback demo mode for static Vercel deployments when backend is offline
+
+      // Fallback demo for static Vercel inspection
       setTimeout(() => {
         const objectUrl = URL.createObjectURL(selectedFile);
         const demoResults = {
@@ -91,39 +94,40 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
               full_name: "Short",
               confidence: 0.88,
               bbox: [80, 110, 160, 175],
-              source: "ENSEMBLE (WBF)"
+              source: "ENSEMBLE (WBF)",
             },
             {
               class: "SP",
               full_name: "Spur",
               confidence: 0.74,
               bbox: [210, 180, 270, 230],
-              source: "ENSEMBLE (WBF)"
+              source: "ENSEMBLE (WBF)",
             },
             {
               class: "SC",
               full_name: "Spurious Copper",
               confidence: 0.62,
               bbox: [320, 95, 365, 140],
-              source: "YOLO26n"
+              source: "YOLO26n",
             },
             {
               class: "MB",
               full_name: "Mouse Bite",
               confidence: 0.53,
               bbox: [140, 310, 195, 355],
-              source: "RT-DETR"
-            }
+              source: "RT-DETR",
+            },
           ],
           tips: [
-            "Short: Unintended connection. Inspect wave soldering temp and residual copper.",
-            "Spur: Irregular protrusion found. Check etching chemical balance.",
-            "Spurious Copper: Unwanted residue on base material. Review etching exposure timing."
-          ]
+            "Short: Unintended bridge detected. Inspect wave soldering temperature and verify residual copper removal.",
+            "Spur: Irregular trace protrusion found. Check etching chemical concentration and wash cycle timings.",
+            "Spurious Copper: Unwanted copper residue on base substrate. Review etching exposure and photoresist adhesion.",
+            "Mouse Bite: Edge void detected on copper trace. Verify mechanical routing alignment and substrate handling.",
+          ],
         };
         setStatus("idle");
         onInferenceComplete(objectUrl, demoResults);
-      }, 1500);
+      }, 1400);
     }
   };
 
@@ -136,126 +140,121 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
   }, []);
 
   return (
-    <div className="w-full max-w-xl mx-auto">
-      <motion.div
-        className={`relative overflow-hidden border-4 border-black p-10 text-center flex flex-col items-center justify-center min-h-[340px] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-colors ${
-          isDragging ? "bg-black text-white" : "bg-white text-black"
+    <div className="w-full">
+      <div
+        className={`relative overflow-hidden rounded-2xl border-2 border-dashed transition-all p-10 sm:p-14 text-center flex flex-col items-center justify-center min-h-[340px] ${
+          isDragging
+            ? "border-emerald-500 bg-emerald-950/20"
+            : "border-zinc-700/80 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-zinc-600"
         }`}
-        animate={{ scale: isDragging ? 1.02 : 1 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+        }}
         onDrop={handleDrop}
       >
-        {/* Background mechanical grid lines */}
-        <div className="absolute inset-0 pointer-events-none opacity-5 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]" />
-
-        {/* Industrial laser scan bar active during uploading and processing */}
-        {(status === "uploading" || status === "processing") && (
-          <motion.div 
-            className="absolute left-0 right-0 h-1 bg-yellow-400 shadow-[0_0_12px_3px_rgba(234,179,8,0.9)] z-10 pointer-events-none"
-            animate={{ top: ["0%", "100%", "0%"] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          />
-        )}
-
         <AnimatePresence mode="wait">
           {status === "idle" && (
-            <motion.div 
-              key="idle" 
-              className="flex flex-col items-center gap-4 relative z-0"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            <motion.div
+              key="idle"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="flex flex-col items-center gap-4 max-w-md mx-auto"
             >
-              <motion.div
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                className="p-4 bg-yellow-300 border-3 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
-              >
-                <UploadCloud className="w-10 h-10 stroke-[2.5]" />
-              </motion.div>
-
-              <div>
-                <h3 className="text-2xl font-black uppercase tracking-tight">Initialize Inspection</h3>
-                <p className="font-mono text-xs mt-1 text-gray-600 font-bold uppercase tracking-wider">Drag & drop raw PCB scan or browse disk</p>
+              <div className="w-14 h-14 rounded-2xl bg-zinc-800/90 border border-zinc-700/80 flex items-center justify-center text-zinc-300 shadow-sm">
+                <UploadCloud className="w-7 h-7 text-zinc-300" />
               </div>
 
-              <motion.label 
-                className="mt-2 px-8 py-3.5 bg-black text-white font-mono font-black uppercase cursor-pointer border-3 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] tracking-wider"
-                whileHover={{ x: -2, y: -2, boxShadow: "8px 8px 0px 0px rgba(0,0,0,1)" }}
-                whileTap={{ x: 2, y: 2, boxShadow: "0px 0px 0px 0px rgba(0,0,0,1)" }}
-                transition={{ type: "spring", stiffness: 500, damping: 20 }}
-              >
-                Select Target Image
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                  if (e.target.files?.length) uploadFile(e.target.files[0]);
-                }} />
-              </motion.label>
+              <div className="space-y-1">
+                <h3 className="text-base sm:text-lg font-medium text-zinc-100">
+                  Select or drop a PCB inspection scan
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Drag and drop your board scan here, or browse files from your computer.
+                </p>
+              </div>
+
+              <label className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-900 text-xs sm:text-sm font-medium cursor-pointer transition-colors shadow-sm">
+                <ImageIcon className="w-4 h-4 text-zinc-700" />
+                <span>Browse Scan Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.length) uploadFile(e.target.files[0]);
+                  }}
+                />
+              </label>
+
+              <p className="text-[11px] font-mono text-zinc-500 pt-1">
+                Accepted: PNG, JPG, JPEG, BMP (up to 25 MB)
+              </p>
             </motion.div>
           )}
 
           {status === "uploading" && (
-            <motion.div 
-              key="uploading" 
-              className="flex flex-col items-center gap-4 relative z-0"
-              initial={{ opacity: 0, y: 10 }}
+            <motion.div
+              key="uploading"
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="flex flex-col items-center gap-4 max-w-sm mx-auto"
             >
-              <motion.div 
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-                className="p-3 bg-black text-white border-2 border-black"
-              >
-                <Loader2 className="w-8 h-8" />
-              </motion.div>
-              <h3 className="text-xl font-black uppercase tracking-tight">Ingesting Scan Binary...</h3>
-              <p className="font-mono text-xs bg-gray-200 px-3 py-1 border border-black font-bold">DISPATCHING PAYLOAD</p>
+              <div className="w-12 h-12 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-200">
+                <Loader2 className="w-6 h-6 animate-spin text-zinc-300" />
+              </div>
+              <div className="space-y-1 text-center">
+                <h3 className="text-sm font-medium text-zinc-200">Uploading Scan</h3>
+                <p className="text-xs font-mono text-zinc-400">Dispatching payload to storage...</p>
+              </div>
             </motion.div>
           )}
 
           {status === "processing" && (
-            <motion.div 
-              key="processing" 
-              className="flex flex-col items-center gap-4 relative z-0 w-full max-w-sm"
-              initial={{ opacity: 0, y: 10 }}
+            <motion.div
+              key="processing"
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="flex flex-col items-center gap-4 w-full max-w-sm mx-auto"
             >
-              <motion.div 
-                animate={{ rotate: [0, 90, 180, 270, 360] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                className="p-3 bg-yellow-300 text-black border-3 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
-              >
-                <Loader2 className="w-8 h-8 stroke-[3]" />
-              </motion.div>
+              <div className="w-12 h-12 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-emerald-400">
+                <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+              </div>
 
-              <div>
-                <h3 className="text-xl font-black uppercase tracking-tight">Dual-Track Engine Active</h3>
-                <p className="font-mono text-xs text-gray-700 mt-1 font-bold uppercase">
-                  YOLO26n + RT-DETR ➔ WBF Fusion
+              <div className="space-y-1 text-center">
+                <h3 className="text-sm font-medium text-zinc-100">Running Ensemble Inference</h3>
+                <p className="text-xs font-mono text-zinc-400">
+                  Executing YOLO26n + RT-DETR with WBF fusion
                 </p>
               </div>
 
-              {/* Animated Progress Meter */}
-              <div className="w-full bg-gray-200 border-2 border-black h-4 p-0.5 overflow-hidden">
-                <motion.div 
-                  className="bg-black h-full"
-                  initial={{ width: "5%" }}
-                  animate={{ width: ["15%", "45%", "85%", "95%"] }}
-                  transition={{ duration: 2.5, ease: "easeInOut", repeat: Infinity }}
+              {/* Determinate-looking smooth progress bar */}
+              <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden mt-2">
+                <motion.div
+                  className="bg-emerald-500 h-full rounded-full"
+                  initial={{ width: "10%" }}
+                  animate={{ width: ["20%", "60%", "90%"] }}
+                  transition={{ duration: 1.8, ease: "easeInOut" }}
                 />
               </div>
 
-              <span className="font-mono text-[10px] uppercase font-bold text-gray-500">
-                Awaiting Message Broker Return
+              <span className="font-mono text-[11px] text-zinc-500">
+                Awaiting task completion
               </span>
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,16 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, AlertTriangle, Cpu, Merge, SlidersHorizontal, Crosshair, CheckCircle2, Scan } from "lucide-react";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  Cpu,
+  SlidersHorizontal,
+  CheckCircle2,
+  Crosshair,
+  Layers,
+} from "lucide-react";
 
 interface Detection {
   class: string;
@@ -26,27 +35,31 @@ interface ResultsViewProps {
 export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const [minConf, setMinConf] = useState(0.45);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
 
-  const filteredDetections = results.detections.filter(d => d.confidence >= minConf);
+  const filteredDetections = results.detections.filter((d) => d.confidence >= minConf);
 
-  useEffect(() => {
+  const renderCanvas = useCallback(() => {
     if (!canvasRef.current || !containerRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const imageUrl = fileKey.startsWith("blob:") || fileKey.startsWith("data:") || fileKey.startsWith("http")
-      ? fileKey
-      : `${apiBase}/${fileKey}`;
+    const imageUrl =
+      fileKey.startsWith("blob:") || fileKey.startsWith("data:") || fileKey.startsWith("http")
+        ? fileKey
+        : `${apiBase}/${fileKey}`;
+
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = imageUrl;
 
     img.onload = () => {
+      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
       const containerWidth = containerRef.current!.clientWidth;
       const scale = containerWidth / img.width;
       const displayWidth = img.width * scale;
@@ -55,253 +68,310 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
       canvas.width = displayWidth;
       canvas.height = displayHeight;
 
+      // Draw background image
       ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
 
+      // Draw bounding boxes
       filteredDetections.forEach((det, i) => {
         const isHovered = hoveredIndex === i;
-        
         const [x1, y1, x2, y2] = det.bbox;
         const scaledX1 = x1 * scale;
         const scaledY1 = y1 * scale;
         const scaledW = (x2 - x1) * scale;
         const scaledH = (y2 - y1) * scale;
 
-        // Highlight logic
-        ctx.strokeStyle = isHovered ? "#3b82f6" : "#ef4444"; // Blue if hovered, else Red
-        ctx.lineWidth = isHovered ? 6 : 3;
-        ctx.strokeRect(scaledX1, scaledY1, scaledW, scaledH);
+        if (isHovered) {
+          // Highlight fill tint
+          ctx.fillStyle = "rgba(56, 189, 248, 0.18)";
+          ctx.fillRect(scaledX1, scaledY1, scaledW, scaledH);
 
-        // Draw label background
-        ctx.fillStyle = isHovered ? "#3b82f6" : "#ef4444";
-        const text = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
-        ctx.font = "bold 14px monospace";
-        const textWidth = ctx.measureText(text).width;
-        ctx.fillRect(scaledX1, scaledY1 - 22, textWidth + 8, 22);
+          // Active border
+          ctx.strokeStyle = "#38bdf8";
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(scaledX1, scaledY1, scaledW, scaledH);
 
-        // Draw label text
-        ctx.fillStyle = "white";
-        ctx.fillText(text, scaledX1 + 4, scaledY1 - 6);
+          // Crosshair corner guides
+          const cornerLen = Math.min(10, scaledW / 3, scaledH / 3);
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          // Top-left
+          ctx.moveTo(scaledX1, scaledY1 + cornerLen);
+          ctx.lineTo(scaledX1, scaledY1);
+          ctx.lineTo(scaledX1 + cornerLen, scaledY1);
+          // Top-right
+          ctx.moveTo(scaledX1 + scaledW - cornerLen, scaledY1);
+          ctx.lineTo(scaledX1 + scaledW, scaledY1);
+          ctx.lineTo(scaledX1 + scaledW, scaledY1 + cornerLen);
+          // Bottom-left
+          ctx.moveTo(scaledX1, scaledY1 + scaledH - cornerLen);
+          ctx.lineTo(scaledX1, scaledY1 + scaledH);
+          ctx.lineTo(scaledX1 + cornerLen, scaledY1 + scaledH);
+          // Bottom-right
+          ctx.moveTo(scaledX1 + scaledW - cornerLen, scaledY1 + scaledH);
+          ctx.lineTo(scaledX1 + scaledW, scaledY1 + scaledH);
+          ctx.lineTo(scaledX1 + scaledW, scaledY1 + scaledH - cornerLen);
+          ctx.stroke();
+        } else {
+          // Standard defect box (rose-500)
+          ctx.strokeStyle = "#f43f5e";
+          ctx.lineWidth = 1.75;
+          ctx.strokeRect(scaledX1, scaledY1, scaledW, scaledH);
+        }
+
+        // Draw precision label pill
+        const labelText = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
+        ctx.font = "600 11px monospace";
+        const textWidth = ctx.measureText(labelText).width;
+        const pillWidth = textWidth + 10;
+        const pillHeight = 18;
+        const pillY = Math.max(0, scaledY1 - pillHeight - 3);
+
+        ctx.fillStyle = isHovered ? "#0284c7" : "rgba(15, 23, 42, 0.9)";
+        ctx.fillRect(scaledX1, pillY, pillWidth, pillHeight);
+
+        ctx.strokeStyle = isHovered ? "#38bdf8" : "#f43f5e";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(scaledX1, pillY, pillWidth, pillHeight);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(labelText, scaledX1 + 5, pillY + 13);
       });
     };
   }, [fileKey, filteredDetections, hoveredIndex]);
 
+  useEffect(() => {
+    renderCanvas();
+  }, [renderCanvas]);
+
+  // Handle canvas click/move to highlight corresponding defect
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current || !imageSize) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const scale = canvas.width / imageSize.width;
+
+    const foundIndex = filteredDetections.findIndex((det) => {
+      const [x1, y1, x2, y2] = det.bbox;
+      return (
+        clickX >= x1 * scale &&
+        clickX <= x2 * scale &&
+        clickY >= y1 * scale &&
+        clickY <= y2 * scale
+      );
+    });
+
+    setHoveredIndex(foundIndex !== -1 ? foundIndex : null);
+  };
+
   return (
-    <motion.div 
-      className="w-full max-w-6xl mx-auto bg-white border-4 border-black rounded-none shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-black flex flex-col overflow-hidden"
-      initial={{ opacity: 0, scale: 0.97, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 280, damping: 25 }}
-    >
-      {/* Top Banner Header */}
-      <div className="flex justify-between items-center border-b-4 border-black p-5 md:p-6 bg-yellow-300">
+    <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl text-zinc-100 flex flex-col">
+      {/* Top Action Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-6 py-4 border-b border-zinc-800 bg-zinc-900/90">
         <div className="flex items-center gap-3">
-          <motion.div
-            animate={{ rotate: [0, 10, -10, 0] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <Merge className="w-7 h-7 md:w-8 md:h-8 stroke-[2.5]" />
-          </motion.div>
-          <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-black">
-            Ensemble WBF Results
-          </h2>
+          <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300">
+            <Layers className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-zinc-100">Inspection Analysis</h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                WBF Ensemble Fused
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400 font-mono">
+              {filteredDetections.length} anomaly targets identified
+            </p>
+          </div>
         </div>
 
-        <motion.button 
+        <button
           onClick={onReset}
-          className="flex items-center gap-2 px-5 py-2.5 bg-black text-white font-mono font-bold uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-sm cursor-pointer"
-          whileHover={{ x: -2, y: -2, boxShadow: "6px 6px 0px 0px rgba(0,0,0,1)" }}
-          whileTap={{ x: 2, y: 2, boxShadow: "0px 0px 0px 0px rgba(0,0,0,1)" }}
-          transition={{ type: "spring", stiffness: 500, damping: 20 }}
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-medium text-zinc-200 transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4 stroke-[3]" /> Inspect Next
-        </motion.button>
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Inspect Next Scan</span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
-        {/* Left Col: Canvas Image & Slider */}
-        <div className="lg:col-span-7 border-r-4 border-black p-6 bg-gray-50 flex flex-col">
-           <div className="flex justify-between items-center border-b-3 border-black pb-3 mb-4">
-             <h3 className="font-mono font-bold uppercase tracking-wider text-xs md:text-sm text-black flex items-center gap-2">
-               <SlidersHorizontal className="w-4 h-4 stroke-[2.5]"/> Confidence Threshold
-             </h3>
-             <motion.span 
-               key={minConf}
-               initial={{ scale: 1.25, backgroundColor: "#facc15" }}
-               animate={{ scale: 1, backgroundColor: "#000000" }}
-               transition={{ type: "spring", stiffness: 450, damping: 25 }}
-               className="text-white px-3 py-0.5 text-base md:text-lg font-black font-mono shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-             >
-               {(minConf * 100).toFixed(0)}%
-             </motion.span>
-           </div>
-           
-           <input 
-             type="range" 
-             min="20" max="95" 
-             value={minConf * 100} 
-             onChange={(e) => setMinConf(parseInt(e.target.value) / 100)}
-             className="w-full h-3 bg-gray-300 rounded-none appearance-none cursor-pointer mb-5 border-2 border-black accent-black"
-           />
-           
-           <div ref={containerRef} className="w-full relative overflow-hidden group">
-             {/* Subtle animated optical scanning beam */}
-             <motion.div 
-               className="absolute left-0 right-0 h-0.5 bg-cyan-400 shadow-[0_0_8px_2px_rgba(34,211,238,0.8)] z-10 pointer-events-none"
-               animate={{ top: ["0%", "100%", "0%"] }}
-               transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-             />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-zinc-800">
+        {/* Left Column: Canvas Viewport & Controls */}
+        <div className="lg:col-span-7 p-6 bg-zinc-950 flex flex-col justify-between">
+          <div className="space-y-4">
+            {/* Filter Slider */}
+            <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
+              <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
+                <SlidersHorizontal className="w-4 h-4 text-zinc-400" />
+                <span>Confidence Threshold</span>
+              </div>
 
-             <canvas ref={canvasRef} className="w-full border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-white mb-3"></canvas>
-           </div>
-           <p className="font-mono text-[11px] text-gray-700 break-all uppercase font-bold tracking-tight">Source: {fileKey}</p>
-        </div>
+              <div className="flex items-center gap-3 flex-1 max-w-xs">
+                <input
+                  type="range"
+                  min="20"
+                  max="95"
+                  value={minConf * 100}
+                  onChange={(e) => setMinConf(parseInt(e.target.value) / 100)}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-200 min-w-[42px] text-center">
+                  {(minConf * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
 
-        {/* Right Col: Data & Tips */}
-        <div className="lg:col-span-5 flex flex-col bg-white">
-          {/* Comparison Stats */}
-          <div className="p-6 border-b-4 border-black bg-white">
-            <h3 className="font-black uppercase text-lg mb-3 text-black flex items-center gap-2">
-              <Cpu className="w-5 h-5 stroke-[2.5]" /> Dual-Track Pipeline
-            </h3>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <motion.div 
-                className="border-3 border-black p-2.5 bg-gray-50 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
-                whileHover={{ y: -2 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              >
-                <p className="font-mono text-[11px] font-bold uppercase text-gray-500">YOLO26n</p>
-                <p className="text-2xl font-black mt-0.5">{results.yolo_count}</p>
-              </motion.div>
-
-              <motion.div 
-                className="border-3 border-black p-2.5 bg-gray-50 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
-                whileHover={{ y: -2 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              >
-                <p className="font-mono text-[11px] font-bold uppercase text-gray-500">RT-DETR</p>
-                <p className="text-2xl font-black mt-0.5">{results.rtdetr_count}</p>
-              </motion.div>
-
-              <motion.div 
-                className="border-3 border-black p-2.5 bg-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
-                whileHover={{ y: -2 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              >
-                <p className="font-mono text-[11px] font-bold uppercase text-yellow-300">Filtered WBF</p>
-                <motion.p 
-                  key={filteredDetections.length}
-                  initial={{ scale: 1.35, color: "#facc15" }}
-                  animate={{ scale: 1, color: "#ffffff" }}
-                  transition={{ type: "spring", stiffness: 450, damping: 20 }}
-                  className="text-2xl font-black mt-0.5"
-                >
-                  {filteredDetections.length}
-                </motion.p>
-              </motion.div>
+            {/* Inspection Canvas Area */}
+            <div
+              ref={containerRef}
+              className="w-full relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 flex items-center justify-center"
+            >
+              <canvas
+                ref={canvasRef}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseLeave={() => setHoveredIndex(null)}
+                className="w-full max-h-[560px] object-contain cursor-crosshair block"
+              />
             </div>
           </div>
 
-          {/* Actionable Tips */}
-          <div className="p-5 border-b-4 border-black bg-red-50">
-             <div className="flex items-center gap-2 mb-2.5 text-red-600">
-               <motion.div
-                 animate={{ scale: [1, 1.18, 1] }}
-                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-               >
-                 <AlertTriangle className="w-5 h-5 stroke-[2.5]" />
-               </motion.div>
-               <h3 className="font-black uppercase text-sm tracking-wider">Recommended Actions</h3>
-             </div>
-             <ul className="list-disc pl-5 space-y-1.5">
-               {results.tips.map((tip, i) => (
-                 <li key={i} className="font-mono text-xs text-black font-bold leading-snug">{tip}</li>
-               ))}
-             </ul>
+          <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-zinc-500">
+            <span>Hover bounding boxes or list items to isolate</span>
+            {imageSize && (
+              <span>
+                Original: {imageSize.width} × {imageSize.height} px
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Telemetry, Recommendations, Anomaly List */}
+        <div className="lg:col-span-5 p-6 bg-zinc-900/50 flex flex-col space-y-6">
+          {/* Telemetry Metrics */}
+          <div>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2.5">
+              <Cpu className="w-3.5 h-3.5" />
+              <span>Model Telemetry</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800">
+                <span className="text-[10px] font-mono text-zinc-400 block">YOLO26n</span>
+                <span className="text-xl font-semibold font-mono text-zinc-100">
+                  {results.yolo_count}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800">
+                <span className="text-[10px] font-mono text-zinc-400 block">RT-DETR</span>
+                <span className="text-xl font-semibold font-mono text-zinc-100">
+                  {results.rtdetr_count}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800">
+                <span className="text-[10px] font-mono text-emerald-400 block">Fused WBF</span>
+                <span className="text-xl font-semibold font-mono text-emerald-400">
+                  {filteredDetections.length}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Scrollable Anomaly List */}
-          <div className="flex-1 flex flex-col p-6 max-h-[420px] overflow-hidden">
-            <h3 className="font-black uppercase text-base border-b-3 border-black pb-2 mb-3 text-black flex items-center justify-between">
-              <span>Detected Anomalies</span>
-              <span className="text-xs font-mono font-bold bg-gray-200 px-2 py-0.5 border border-black">
-                {filteredDetections.length} Found
+          {/* Root Cause Recommendations */}
+          {results.tips && results.tips.length > 0 && (
+            <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-800/40 text-amber-200">
+              <div className="flex items-center gap-2 mb-2 text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider">
+                  Process Diagnostics & Root Cause
+                </h3>
+              </div>
+              <ul className="space-y-1.5 text-xs text-amber-200/90 leading-relaxed list-disc pl-4">
+                {results.tips.map((tip, i) => (
+                  <li key={i}>{tip}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Anomaly Catalog */}
+          <div className="flex-1 flex flex-col min-h-[220px]">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
+                Detected Defect Catalog
+              </h3>
+              <span className="text-xs font-mono text-zinc-400">
+                {filteredDetections.length} items
               </span>
-            </h3>
-            
+            </div>
+
             <AnimatePresence mode="wait">
               {filteredDetections.length === 0 ? (
-                <motion.div 
-                  key="empty"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                  className="p-6 bg-green-300 border-3 border-black text-black font-black uppercase text-center my-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center gap-2"
+                <motion.div
+                  key="empty-state"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="p-6 rounded-xl bg-zinc-900 border border-zinc-800 text-center my-auto flex flex-col items-center gap-2"
                 >
-                  <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />
-                  <span>QA Passed. Zero defects at {(minConf*100).toFixed(0)}% confidence.</span>
+                  <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+                  <p className="text-xs font-medium text-zinc-200">Quality Assurance Passed</p>
+                  <p className="text-[11px] text-zinc-500 max-w-xs">
+                    No anomalies detected above {(minConf * 100).toFixed(0)}% confidence threshold.
+                  </p>
                 </motion.div>
               ) : (
-                <motion.div 
-                  key="list"
-                  className="space-y-3 overflow-y-auto pr-3 custom-scrollbar flex-1 pb-2"
-                  variants={{
-                    hidden: { opacity: 0 },
-                    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
-                  }}
-                  initial="hidden"
-                  animate="show"
-                >
+                <div className="space-y-2 overflow-y-auto max-h-[300px] pr-1 custom-scrollbar">
                   {filteredDetections.map((det, i) => {
                     const isHovered = hoveredIndex === i;
                     return (
-                      <motion.div 
+                      <div
                         key={`${det.class}-${i}`}
-                        variants={{
-                          hidden: { opacity: 0, x: 15 },
-                          show: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 380, damping: 24 } }
-                        }}
-                        whileHover={{ x: 6, transition: { type: "spring", stiffness: 450, damping: 20 } }}
-                        whileTap={{ scale: 0.98 }}
                         onMouseEnter={() => setHoveredIndex(i)}
                         onMouseLeave={() => setHoveredIndex(null)}
-                        className={`border-3 p-3.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-black transition-colors cursor-crosshair ${
-                          isHovered ? 'bg-blue-50 border-blue-600' : 'bg-white border-black'
+                        className={`p-3 rounded-xl border text-xs transition-colors cursor-pointer ${
+                          isHovered
+                            ? "border-sky-500 bg-sky-950/20 text-zinc-100"
+                            : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 text-zinc-300"
                         }`}
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className={`font-black text-lg uppercase leading-tight flex items-center gap-1.5 ${
-                              isHovered ? 'text-blue-600' : ''
-                            }`}>
-                              {isHovered && <Crosshair className="w-4 h-4 text-blue-600 animate-spin" />}
-                              {det.class} - {det.full_name}
-                            </p>
-                            <p className={`font-mono text-xs mt-1 inline-block px-1.5 py-0.5 font-bold ${
-                              isHovered ? 'bg-blue-600 text-white' : 'bg-black text-white'
-                            }`}>
-                              Conf: {(det.confidence * 100).toFixed(1)}%
-                            </p>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-1.5 py-0.5 rounded font-mono font-bold text-[10px] ${
+                                isHovered
+                                  ? "bg-sky-500 text-black"
+                                  : "bg-rose-950 text-rose-300 border border-rose-800/60"
+                              }`}
+                            >
+                              {det.class}
+                            </span>
+                            <span className="font-medium text-zinc-200">{det.full_name}</span>
                           </div>
-                          <div className="bg-gray-100 px-2 py-0.5 text-[11px] font-bold font-mono border border-black">
-                            {det.source}
+
+                          <div className="flex items-center gap-2 font-mono">
+                            <span className="text-zinc-400 text-[11px]">
+                              {(det.confidence * 100).toFixed(1)}%
+                            </span>
+                            {isHovered && <Crosshair className="w-3.5 h-3.5 text-sky-400" />}
                           </div>
                         </div>
-                        <div className={`font-mono text-[11px] p-2 border ${
-                          isHovered ? 'bg-blue-100 border-blue-400 text-blue-900' : 'bg-gray-50 border-gray-300 text-gray-800'
-                        }`}>
-                          <span className={`font-bold mr-1.5 ${isHovered ? 'text-blue-700' : 'text-gray-500'}`}>WBF:</span>
-                          [{det.bbox.map(n => n.toFixed(0)).join(', ')}]
+
+                        <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                          <span>Source: {det.source}</span>
+                          <span>
+                            [{det.bbox.map((n) => Math.round(n)).join(", ")}]
+                          </span>
                         </div>
-                      </motion.div>
+                      </div>
                     );
                   })}
-                </motion.div>
+                </div>
               )}
             </AnimatePresence>
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

@@ -1,74 +1,120 @@
 "use client";
+
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileUploader } from "@/components/ui/FileUploader";
 import { ResultsView } from "@/components/ui/ResultsView";
-import { Sparkles, ScanLine } from "lucide-react";
+import { Cpu, ShieldCheck } from "lucide-react";
 
 export default function Home() {
-  const [inferenceData, setInferenceData] = useState<{fileKey: string, results: any} | null>(null);
+  const [inferenceData, setInferenceData] = useState<{ fileKey: string; results: any } | null>(null);
 
   return (
-    <div className="min-h-screen bg-[#f3f3f1] flex flex-col items-center justify-center p-6 font-sans selection:bg-yellow-300 selection:text-black">
-      <div className="max-w-6xl w-full space-y-8 my-auto">
-        <motion.div 
-          className="text-center space-y-3"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        >
-          <motion.div 
-            className="inline-block"
-            whileHover={{ scale: 1.01, rotate: -0.5 }}
-            transition={{ type: "spring", stiffness: 400, damping: 20 }}
-          >
-            <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter text-black border-4 border-black px-8 py-3 bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center gap-3">
-              <ScanLine className="w-8 h-8 md:w-10 md:h-10 text-black stroke-[3]" />
-              PCB Defect Detection
-            </h1>
-          </motion.div>
-
-          <div>
-            <motion.p 
-              className="text-sm md:text-base text-black max-w-xl mx-auto font-mono font-bold bg-yellow-300 px-4 py-1.5 border-2 border-black inline-block shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] uppercase tracking-wider"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.15, type: "spring", stiffness: 350, damping: 25 }}
-            >
-              DUAL-TRACK ENSEMBLE: YOLO26n ➔ RT-DETR ➔ WBF
-            </motion.p>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
+      {/* Top Engineering App Bar */}
+      <header className="border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-emerald-400">
+              <Cpu className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm tracking-tight text-zinc-100">PCB Optical Inspection</span>
+                <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+                  v2.0
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 font-mono hidden sm:block">
+                Dual-Track Ensemble: YOLO26n + RT-DETR (WBF IoU 0.40)
+              </p>
+            </div>
           </div>
-        </motion.div>
 
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-mono text-zinc-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Pipeline Online</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col justify-center">
         <AnimatePresence mode="wait">
           {!inferenceData ? (
             <motion.div
-              key="uploader"
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -15 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="w-full flex justify-center"
+              key="uploader-container"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="w-full max-w-3xl mx-auto space-y-6"
             >
-              <FileUploader onInferenceComplete={(fileKey, results) => setInferenceData({fileKey, results})} />
+              <div className="text-center space-y-2">
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-100">
+                  Automated Defect & Anomaly Inspection
+                </h1>
+                <p className="text-sm text-zinc-400 max-w-lg mx-auto">
+                  Upload an optical scan or micro-photograph to detect shorts, spurs, mouse bites, and foreign objects with fused bounding boxes.
+                </p>
+              </div>
+
+              <FileUploader
+                onInferenceComplete={(fileKey, results) => setInferenceData({ fileKey, results })}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800/80 text-left">
+                  <p className="text-xs font-medium text-zinc-300">Track 1: YOLO26n</p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Lightweight convolutional backbone for real-time edge defect localization.
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800/80 text-left">
+                  <p className="text-xs font-medium text-zinc-300">Track 2: RT-DETR</p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Vision Transformer for global context and high-density defect queries.
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800/80 text-left">
+                  <p className="text-xs font-medium text-zinc-300">Weighted Box Fusion</p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Coordinate averaging weighted by confidence to suppress false alarms.
+                  </p>
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div
-              key="results"
-              initial={{ opacity: 0, scale: 0.96, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 20 }}
-              transition={{ type: "spring", stiffness: 280, damping: 24 }}
+              key="results-container"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="w-full"
             >
-              <ResultsView 
-                fileKey={inferenceData.fileKey} 
-                results={inferenceData.results} 
-                onReset={() => setInferenceData(null)} 
+              <ResultsView
+                fileKey={inferenceData.fileKey}
+                results={inferenceData.results}
+                onReset={() => setInferenceData(null)}
               />
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-zinc-800/60 py-4 text-center text-xs font-mono text-zinc-500">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>PCB Surface Defect & Foreign Object Inspection</span>
+          <span className="flex items-center gap-1.5 text-zinc-400">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            PKU-Market-PCB Benchmark Taxonomy
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
