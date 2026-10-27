@@ -26,6 +26,6 @@ export interface InferenceResults {
   detections: Detection[];
   tips: string[];
   route?: Route;
-  image?: { width: number; height: number };
+  image?: { width: number; height: number; green_share?: number };
   timings_ms?: Record<string, number>;
 }

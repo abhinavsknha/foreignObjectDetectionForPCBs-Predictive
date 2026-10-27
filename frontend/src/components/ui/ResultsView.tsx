@@ -50,8 +50,9 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // 0.25 is the reporting threshold the detectors were evaluated at.
-  const [minConf, setMinConf] = useState(0.25);
+  // 40% balanced false alarms and recall best on the validation images (precision 0.82, recall 0.70);
+  // the detectors were evaluated at 25%, which the slider still reaches.
+  const [minConf, setMinConf] = useState(0.4);
   const [hovered, setHovered] = useState<{ index: number; source: HoverSource } | null>(null);
   const [loaded, setLoaded] = useState<{ src: string; el: HTMLImageElement } | null>(null);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -211,6 +212,19 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
     URL.revokeObjectURL(url);
   };
 
+  // Warn when the scan is unlike the training data or nothing is reported with real confidence.
+  const topConfidence = results.detections.reduce((m, d) => Math.max(m, d.confidence), 0);
+  const looksGreen = (results.image?.green_share ?? 0) >= 0.4;
+  const lowConfidence = results.detections.length > 0 && topConfidence < 0.5;
+  const domainWarning = looksGreen
+    ? "This looks like a green solder-mask board. The detectors were trained on DsPCBSD+ close-ups of copper-toned boards (none of the training images are green), so detections on this scan are unreliable and defects may be missed."
+    : lowConfidence
+      ? `The most confident detection is ${(topConfidence * 100).toFixed(0)}%. Detections this uncertain are often false alarms, especially on scans unlike the training data (DsPCBSD+). Treat them as unconfirmed.`
+      : null;
+  const hiddenCount = results.detections.length - filteredDetections.length;
+  // Process tips start with the defect's name; show only those for defects that are currently displayed.
+  const visibleTips = (results.tips ?? []).filter((tip) => filteredDetections.some((d) => tip.startsWith(`${d.full_name}:`)));
+
   const route = results.route;
   const imgW = img?.naturalWidth ?? results.image?.width;
   const imgH = img?.naturalHeight ?? results.image?.height;
@@ -256,6 +270,19 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
           </button>
         </div>
       </div>
+
+      {domainWarning && (
+        <div
+          role="note"
+          className="flex items-start gap-2.5 px-6 py-3 border-b border-amber-300 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200"
+        >
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+          <p className="text-xs leading-relaxed">
+            <span className="font-semibold">Low-confidence result. </span>
+            {domainWarning}
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-stone-200 dark:divide-zinc-800">
         {/* Left Column: Canvas Viewport & Controls */}
@@ -417,7 +444,7 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
           </div>
 
           {/* Root Cause Recommendations */}
-          {results.tips && results.tips.length > 0 && (
+          {visibleTips.length > 0 && (
             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/40 text-amber-900 dark:text-amber-200">
               <div className="flex items-center gap-2 mb-2 text-amber-800 dark:text-amber-300">
                 <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -426,7 +453,7 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                 </h3>
               </div>
               <ul className="space-y-1.5 text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed list-disc pl-4">
-                {results.tips.map((tip, i) => (
+                {visibleTips.map((tip, i) => (
                   <li key={i}>{tip}</li>
                 ))}
               </ul>
@@ -454,9 +481,13 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                   className="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 text-center my-auto flex flex-col items-center gap-2"
                 >
                   <CheckCircle2 className="w-7 h-7 text-emerald-700 dark:text-emerald-400" />
-                  <p className="text-xs font-medium text-stone-900 dark:text-zinc-200">Quality Assurance Passed</p>
+                  <p className="text-xs font-medium text-stone-900 dark:text-zinc-200">
+                    {hiddenCount > 0 ? "No detections at this threshold" : "Quality Assurance Passed"}
+                  </p>
                   <p className="text-[11px] text-stone-600 dark:text-zinc-400 max-w-xs">
-                    No anomalies detected above {(minConf * 100).toFixed(0)}% confidence threshold.
+                    {hiddenCount > 0
+                      ? `${hiddenCount} lower-confidence detection${hiddenCount === 1 ? " is" : "s are"} hidden. Lower the threshold to review ${hiddenCount === 1 ? "it" : "them"}.`
+                      : `No anomalies detected above ${(minConf * 100).toFixed(0)}% confidence threshold.`}
                   </p>
                 </motion.div>
               ) : (

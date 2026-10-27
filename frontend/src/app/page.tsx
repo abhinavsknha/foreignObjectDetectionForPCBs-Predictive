@@ -112,7 +112,7 @@ export default function Home() {
           <span>PCB Surface Defect & Foreign Object Inspection</span>
           <span className="flex items-center gap-1.5 text-stone-700 dark:text-zinc-400">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
-            PKU-Market-PCB Benchmark Taxonomy
+            Trained on DsPCBSD+ (9 defect classes)
           </span>
         </div>
       </footer>

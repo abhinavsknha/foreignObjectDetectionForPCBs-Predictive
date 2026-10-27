@@ -229,6 +229,10 @@ def run_pipeline(image_path, models, progress=None):
     emit("checking_resolution")
     t = time.perf_counter()
     base = limit_size(img)
+    # Share of green solder-mask pixels. None of the DsPCBSD+ training images are green boards, so a high
+    # value means the scan is unlike anything the detectors were trained on.
+    b_ch, g_ch, r_ch = (base[..., i].astype(np.int16) for i in range(3))
+    green_share = float(((g_ch > r_ch + 12) & (g_ch > b_ch + 12)).mean())
     route = check_resolution(base)
     route["native"] = {"width": W, "height": H}
     route["gate_flagged"] = route["needs_sr"]
@@ -286,7 +290,7 @@ def run_pipeline(image_path, models, progress=None):
         "detections": detections,
         "tips": tips,
         "route": route,
-        "image": {"width": W, "height": H},
+        "image": {"width": W, "height": H, "green_share": round(green_share, 3)},
         "timings_ms": {k: round(v, 1) for k, v in timings.items()},
         "fusion": {"w_yolo": W_YOLO, "w_detr": W_DETR, "iou": FUSE_IOU, "min_confidence": REPORT_CONF},
     }
