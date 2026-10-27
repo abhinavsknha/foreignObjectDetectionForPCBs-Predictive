@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import logging
 import os
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -66,16 +67,22 @@ def read_root():
     return {"status": "ok", "message": "API is running"}
 
 
+_worker_seen = 0.0
+
+
 @app.get("/api/health")
 def health():
     """Used by the UI status pill: reports whether an inference worker can take a job."""
+    global _worker_seen
     if INLINE:
         return {"api": "ok", "mode": "inline", "worker": True, "models_loaded": pipeline.models_loaded()}
     try:
-        worker = bool(celery_app.control.ping(timeout=1.0))
+        if celery_app.control.ping(timeout=2.0):
+            _worker_seen = time.time()
     except Exception:  # noqa: BLE001
-        worker = False
-    return {"api": "ok", "mode": "celery", "worker": worker}
+        pass
+    # A worker that is busy with a job cannot answer a ping, so a reply in the last minute still counts.
+    return {"api": "ok", "mode": "celery", "worker": time.time() - _worker_seen < 60}
 
 
 @app.post("/api/upload/local")

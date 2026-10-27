@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_HEADERS, getApiBase } from "@/lib/api";
 
 type State = "checking" | "online" | "offline";
@@ -22,6 +22,7 @@ const DOT: Record<State, string> = {
 // Asks the back end whether an inference worker is ready, instead of assuming it is.
 export function PipelineStatus() {
   const [state, setState] = useState<State>("checking");
+  const misses = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +41,9 @@ export function PipelineStatus() {
         /* unreachable: stays offline */
       }
       if (cancelled) return;
-      setState(next);
+      // One missed check is often just a busy worker or a dropped tunnel request; two in a row is an outage.
+      misses.current = next === "online" ? 0 : misses.current + 1;
+      setState((prev) => (next === "online" || prev === "checking" || misses.current >= 2 ? next : prev));
       timer = setTimeout(check, POLL_MS);
     };
     check();
