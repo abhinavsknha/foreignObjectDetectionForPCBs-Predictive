@@ -54,19 +54,25 @@ The models are trained to classify defects across nine industrial categories def
 
 ## Core Features
 
+### Resolution Check and Super-Resolution
+Every upload is first measured by the Adaptive Resolution Router (ARR): Canny edge density, local contrast and the share of high-frequency energy in the 2D FFT. If the check flags the image, and the image is smaller than the detector input (long side under 640 px), it is enlarged 2x with bicubic interpolation, sharpened with an unsharp mask (alpha 1.5, sigma 3) and averaged back to its size. Larger images are never enhanced. The results screen shows which path the image took and the three measurements behind the decision.
+* With the thresholds used in the paper (high-frequency ratio below 0.7), the check flags almost every image. On 400 validation images enhancement did not improve detection (F1 0.770 without it, 0.749 with it), so it can be switched off with `SR_POLICY=off`.
+
 ### Asynchronous Dual-Track Ensemble
-Instead of relying on a single detector, the Celery worker passes each PCB image through both YOLO and RT-DETR models. 
-* Predictions with overlap (IoU >= 0.40) are merged using confidence-weighted coordinate averaging.
-* Independent high-confidence detections from either detector are preserved.
-* The API returns the raw counts from each model alongside the final fused count to verify ensemble contribution.
+The Celery worker passes each PCB image through both YOLO26n and RT-DETR-L.
+* Boxes are merged with asymmetric Weighted Box Fusion: track weights 1.0 (YOLO26n) and 1.5 (RT-DETR-L), IoU 0.5, minimum fused score 0.25.
+* Only the fused output is shown to the operator, with each detection's source (both detectors, or one) and per-detector confidences.
+* The API also returns the raw per-track counts so the ensemble contribution can be checked.
 
-### Zero-Latency Client-Side Thresholding
-The backend worker returns all detected anomalies meeting a low baseline threshold (20%). The Next.js frontend provides an interactive slider (20% to 95%):
-* Moving the slider filters the bounding box array client-side.
-* The HTML5 Canvas clears and redraws boxes in real time without sending additional HTTP requests to the backend server.
+### Client-Side Thresholding
+The worker returns every fused detection with a score of 0.25 or more. The Next.js slider (20% to 95%, default 40%) filters them in the browser:
+* 40% gave the best balance on validation images (precision 0.82, recall 0.70, 0.3 false alarms per image, against 0.68 / 0.81 / 0.73 at 25%).
+* Moving the slider redraws the canvas without any request to the backend.
+* A notice appears when the scan looks unlike the training data (for example green solder-mask boards) or when no detection reaches 50%.
+* **Export CSV** downloads the detections currently shown.
 
-### Crosshair Defect Inspection
-Hovering over any item in the detected anomaly list dynamically highlights the corresponding bounding box on the PCB canvas in high-contrast blue, allowing operators to locate tiny flaws on densely packed circuit boards immediately.
+### Defect Inspection
+Hovering a box on the image shows a detail card (class, fused score, which detectors agree, size and position) and scrolls the catalogue to its entry. Hovering a catalogue entry highlights its box.
 
 ### Automated Manufacturing Recommendations
 Based on the detected defect classes, the system evaluates the root cause in the PCB fabrication line (etching, drilling, wave soldering, or cleanroom handling) and displays prioritized physical remediation steps.
@@ -78,9 +84,10 @@ Based on the detected defect classes, the system evaluates the root cause in the
 ```
 ├── backend/
 │   ├── app/
-│   │   ├── celery_worker.py     # Dual-track YOLO + RT-DETR inference & WBF math
+│   │   ├── pipeline.py          # Resolution check, super-resolution, dual-track inference, WBF
+│   │   ├── celery_worker.py     # Celery task: runs the pipeline, saves the record in the background
 │   │   ├── database.py          # SQLAlchemy connection engine (pg8000 driver)
-│   │   ├── main.py              # FastAPI endpoints and static file mounts
+│   │   ├── main.py              # FastAPI endpoints, health check, upload validation
 │   │   ├── models.py            # PostgreSQL schema with pgvector embeddings
 │   │   └── training_cron.py     # Scheduled task skeleton for incremental retraining
 │   ├── test_db.py               # Database table initialization script
@@ -90,16 +97,45 @@ Based on the detected defect classes, the system evaluates the root cause in the
 │   │   ├── app/
 │   │   │   ├── layout.tsx       # Root Next.js layout configuration
 │   │   │   └── page.tsx         # Primary application container and view router
+│   │   ├── lib/                 # API address resolution, shared types
 │   │   └── components/ui/
-│   │       ├── FileUploader.tsx # Drag-and-drop upload handler with status polling
-│   │       └── ResultsView.tsx  # Canvas defect renderer, confidence slider, hover states
+│   │       ├── FileUploader.tsx # Upload, stage stepper, status polling, error state
+│   │       ├── ResultsView.tsx  # Canvas renderer, slider, hover detail, CSV export
+│   │       ├── PipelineStatus.tsx # Header status from /api/health
+│   │       └── ThemeToggle.tsx  # Light / dark theme
+│   ├── public/config.json       # Backend address used by the deployed site
 │   ├── package.json
 │   └── tsconfig.json
 ├── docker-compose.yml           # PostgreSQL (pgvector) and Redis services
-├── start_app.bat                # Windows one-click launcher for frontend, backend, and worker
+├── start_app.bat                # Developer launcher: dev server, API and worker
+├── start_demo.bat               # Demo: API + worker + public tunnel (for the Vercel site)
+├── start_demo_local.bat         # Demo: everything on this laptop, no tunnel
+├── run_tunnel.py                # Keeps the tunnel on its fixed address, restarts it if it drops
 ├── pcb_data.yaml                # YOLO dataset configuration
 └── .gitignore                   # Excludes raw datasets, weights, and caches
 ```
+
+---
+
+## Running the demo (Windows)
+
+Both launchers need the model weights (`MODEL RESULTS/MORE TRAINING/YOLO/best.pt` and `.../DETR/best.pt`, or set `YOLO_WEIGHTS` / `DETR_WEIGHTS`) and a `backend/.env` with `REDIS_URL` and `DATABASE_URL`.
+
+| Launcher | What it runs | Use it when |
+| :--- | :--- | :--- |
+| `start_demo.bat` | API, Celery worker and a public tunnel at `https://fodpcb-predictive-api.loca.lt`; the Vercel site (`fodpcb-predictive.vercel.app`) talks to it | Showing the deployed site |
+| `start_demo_local.bat` | The same backend plus the website at `http://localhost:3000`, no tunnel | The tunnel is slow or down |
+
+Wait for the Celery Worker window to print `ready` (about 30 seconds). The header shows "Pipeline Online" once the worker answers. Keep the laptop awake and online. The first inspection after a start is slower.
+
+Settings (environment variables for the backend):
+
+| Variable | Default | Effect |
+| :--- | :--- | :--- |
+| `SR_POLICY` | `gate` | `off` disables super-resolution |
+| `SR_MAX_SIDE` | `640` | Images with a long side at or above this are never enhanced |
+| `INFERENCE_MODE` | `celery` | `inline` runs inference inside the API, no Redis needed (development) |
+| `YOLO_WEIGHTS`, `DETR_WEIGHTS` | repo paths | Weight file locations |
 
 ---
 
@@ -192,16 +228,19 @@ Open `http://localhost:3000` in your web browser.
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `POST` | `/api/upload/local` | Ingests PCB image binary and saves to local storage |
-| `POST` | `/api/inference/trigger` | Dispatches image path to the Celery queue for asynchronous inference |
-| `GET` | `/api/inference/status/{task_id}` | Polls Celery task state (`PENDING`, `SUCCESS`, or `FAILURE`) |
-| `GET` | `/{file_path}` | Static file endpoint serving raw PCB scans to the canvas |
+| `GET` | `/api/health` | Whether an inference worker is available (drives the header status) |
+| `POST` | `/api/inspect` | Uploads the image and queues the inspection in one request |
+| `POST` | `/api/upload/local` | Ingests a PCB image and saves it to local storage |
+| `POST` | `/api/inference/trigger` | Queues a stored image for inspection |
+| `GET` | `/api/inference/status/{task_id}` | Task state: `processing` with its current stage, `completed` with the result, or `failed`. `?wait=15&since=<stage>` holds the request until the stage changes |
+| `GET` | `/{file_path}` | Static file endpoint serving raw PCB scans |
 
 ---
 
 ## Technical Specifications
 
-* **Ensemble Fusion**: Weighted Box Fusion (WBF) with an IoU matching threshold of `0.40`.
-* **Feature Embeddings**: 512-dimensional vectors generated per scan and stored using PostgreSQL `vector(512)` type.
-* **Canvas Rendering**: Dynamic 2D context scaling mapped to native image dimensions.
-* **Database Driver**: Pure-Python `pg8000` to maintain compatibility with modern Python versions without requiring local C compilers.
+* **Ensemble fusion**: asymmetric Weighted Box Fusion (weights 1.0 and 1.5, IoU 0.5, minimum score 0.25). When one detector reports nothing, the other's boxes are kept with their confidence halved.
+* **Training data and limits**: both detectors were trained on DsPCBSD+ (nine classes, 226 px close-ups of copper-toned boards). Scans of other board types, such as green solder-mask boards, are outside the training data and give unreliable results.
+* **Validation results** (200 to 400 DsPCBSD+ validation images, this pipeline): recall 0.81 to 0.85 and precision 0.68 to 0.73 at the 25% reporting threshold, depending on the sample.
+* **Records**: each inspection is saved to PostgreSQL in the background, so a slow or unreachable database never delays a result. The 512-dimensional `embedding` column is a placeholder: the vectors currently stored are random, not model embeddings, so similarity search is not yet meaningful.
+* **Database driver**: pure-Python `pg8000`, with connection timeouts and health checks.
