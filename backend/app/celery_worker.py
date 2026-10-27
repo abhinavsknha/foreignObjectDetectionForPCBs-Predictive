@@ -1,5 +1,6 @@
 import os
 import ssl
+import threading
 
 from celery import Celery, signals
 from dotenv import load_dotenv
@@ -38,34 +39,36 @@ def warm_up_models(**_):
     print("Ensemble models ready.")
 
 
+_owner_id = None
+
+
 def save_to_db(file_key, detections):
     """Persist the inspection record. Inference does not depend on the database being reachable."""
+    global _owner_id
     try:
         import numpy as np
 
         db = SessionLocal()
         try:
-            # Create a dummy user for local testing if none exists
-            user = db.query(models.User).first()
-            if not user:
-                user = models.User(email="admin@pcb-qa.local", hashed_password="hashed")
-                db.add(user)
-                db.commit()
-                db.refresh(user)
+            if _owner_id is None:
+                # Create a dummy user for local testing if none exists
+                user = db.query(models.User).first()
+                if not user:
+                    user = models.User(email="admin@pcb-qa.local", hashed_password="hashed")
+                    db.add(user)
+                    db.flush()
+                _owner_id = user.id
 
-            # Create upload record with a 512-D vector (simulated from RT-DETR bottleneck)
-            simulated_embedding = np.random.rand(512).tolist()
-
+            # Upload record with a 512-D vector (simulated from RT-DETR bottleneck)
             db_upload = models.Upload(
                 filename=file_key,
                 s3_key=file_key,
                 s3_url=f"http://localhost:8000/{file_key}",
-                owner_id=user.id,
-                embedding=simulated_embedding,
+                owner_id=_owner_id,
+                embedding=np.random.rand(512).tolist(),
             )
             db.add(db_upload)
-            db.commit()
-            db.refresh(db_upload)
+            db.flush()  # assigns the id without another round trip
 
             db.add(models.DetectionResult(upload_id=db_upload.id, boxes=detections, used_for_training=0))
             db.commit()
@@ -82,7 +85,8 @@ def run_inference(file_key, progress=None):
     results = pipeline.run_pipeline(file_key, pipeline.get_models(), progress=progress)
     print(f"Ensemble completed in {results['timings_ms']['total'] / 1000:.2f}s "
           f"({results['route']['path']}, {results['fused_count']} fused detections)")
-    save_to_db(file_key, results["detections"])
+    # Saved in the background: the operator gets the result without waiting for the database.
+    threading.Thread(target=save_to_db, args=(file_key, results["detections"]), daemon=True).start()
     return {"status": "success", "file_key": file_key, "results": results}
 
 
