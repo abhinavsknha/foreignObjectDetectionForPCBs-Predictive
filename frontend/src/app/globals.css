@@ -1,9 +1,7 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Theme is switched by the data-theme attribute on <html>; `dark:` utilities follow it. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
   --color-background: var(--background);
@@ -12,9 +10,23 @@
   --font-mono: var(--font-geist-mono);
 }
 
-:root {
+:root,
+[data-theme="dark"] {
   --background: #09090b;
   --foreground: #f4f4f5;
+  --scroll-track: #18181b;
+  --scroll-thumb: #3f3f46;
+  --scroll-thumb-hover: #52525b;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --background: #f7f4ec;
+  --foreground: #1c1917;
+  --scroll-track: #efebe2;
+  --scroll-thumb: #c9c2b3;
+  --scroll-thumb-hover: #a8a091;
+  color-scheme: light;
 }
 
 body {
@@ -29,13 +41,13 @@ body {
   height: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #18181b;
+  background: var(--scroll-track);
   border-radius: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: var(--scroll-thumb);
   border-radius: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--scroll-thumb-hover);
 }

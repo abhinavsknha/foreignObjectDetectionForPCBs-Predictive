@@ -168,21 +168,21 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
   };
 
   return (
-    <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl text-zinc-100 flex flex-col">
+    <div className="w-full bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xl text-stone-900 dark:text-zinc-100 flex flex-col">
       {/* Top Action Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-6 py-4 border-b border-zinc-800 bg-zinc-900/90">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-6 py-4 border-b border-stone-200 dark:border-zinc-800 bg-[#fffdf8] dark:bg-zinc-900/90">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300">
+          <div className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-zinc-800 border border-stone-300 dark:border-zinc-700 flex items-center justify-center text-stone-800 dark:text-zinc-300">
             <Layers className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-zinc-100">Inspection Analysis</h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+              <h2 className="text-base font-semibold text-stone-900 dark:text-zinc-100">Inspection Analysis</h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-stone-100 dark:bg-zinc-800 text-stone-800 dark:text-zinc-300 border border-stone-300 dark:border-zinc-700">
                 WBF Ensemble Fused
               </span>
             </div>
-            <p className="text-xs text-zinc-400 font-mono">
+            <p className="text-xs text-stone-700 dark:text-zinc-400 font-mono">
               {filteredDetections.length} anomaly targets identified
             </p>
           </div>
@@ -190,21 +190,21 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
 
         <button
           onClick={onReset}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-medium text-zinc-200 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-stone-100 dark:bg-zinc-800 hover:bg-stone-200 dark:hover:bg-zinc-700 border border-stone-300 dark:border-zinc-700 text-xs font-medium text-stone-900 dark:text-zinc-200 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Inspect Next Scan</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-zinc-800">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-stone-200 dark:divide-zinc-800">
         {/* Left Column: Canvas Viewport & Controls */}
-        <div className="lg:col-span-7 p-6 bg-zinc-950 flex flex-col justify-between">
+        <div className="lg:col-span-7 p-6 bg-[#f7f4ec] dark:bg-zinc-950 flex flex-col justify-between">
           <div className="space-y-4">
             {/* Filter Slider */}
-            <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-              <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
-                <SlidersHorizontal className="w-4 h-4 text-zinc-400" />
+            <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-[#fffdf8] dark:bg-zinc-900/60 border border-stone-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2 text-xs font-medium text-stone-800 dark:text-zinc-300">
+                <SlidersHorizontal className="w-4 h-4 text-stone-700 dark:text-zinc-400" />
                 <span>Confidence Threshold</span>
               </div>
 
@@ -215,9 +215,9 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                   max="95"
                   value={minConf * 100}
                   onChange={(e) => setMinConf(parseInt(e.target.value) / 100)}
-                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                  className="w-full h-1.5 bg-stone-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-600 dark:accent-emerald-500"
                 />
-                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-200 min-w-[42px] text-center">
+                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-stone-100 dark:bg-zinc-800 border border-stone-300 dark:border-zinc-700 text-stone-900 dark:text-zinc-200 min-w-[42px] text-center">
                   {(minConf * 100).toFixed(0)}%
                 </span>
               </div>
@@ -226,7 +226,7 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
             {/* Inspection Canvas Area */}
             <div
               ref={containerRef}
-              className="w-full relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 flex items-center justify-center"
+              className="w-full relative rounded-xl overflow-hidden border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-center"
             >
               <canvas
                 ref={canvasRef}
@@ -237,7 +237,7 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-zinc-500">
+          <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-stone-600 dark:text-zinc-400">
             <span>Hover bounding boxes or list items to isolate</span>
             {imageSize && (
               <span>
@@ -248,29 +248,29 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
         </div>
 
         {/* Right Column: Telemetry, Recommendations, Anomaly List */}
-        <div className="lg:col-span-5 p-6 bg-zinc-900/50 flex flex-col space-y-6">
+        <div className="lg:col-span-5 p-6 bg-[#fffdf8] dark:bg-zinc-900/50 flex flex-col space-y-6">
           {/* Telemetry Metrics */}
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-stone-700 dark:text-zinc-400 uppercase tracking-wider mb-2.5">
               <Cpu className="w-3.5 h-3.5" />
               <span>Model Telemetry</span>
             </div>
             <div className="grid grid-cols-3 gap-2.5">
-              <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800">
-                <span className="text-[10px] font-mono text-zinc-400 block">YOLO26n</span>
-                <span className="text-xl font-semibold font-mono text-zinc-100">
+              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
+                <span className="text-[10px] font-mono text-stone-700 dark:text-zinc-400 block">YOLO26n</span>
+                <span className="text-xl font-semibold font-mono text-stone-900 dark:text-zinc-100">
                   {results.yolo_count}
                 </span>
               </div>
-              <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800">
-                <span className="text-[10px] font-mono text-zinc-400 block">RT-DETR</span>
-                <span className="text-xl font-semibold font-mono text-zinc-100">
+              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
+                <span className="text-[10px] font-mono text-stone-700 dark:text-zinc-400 block">RT-DETR</span>
+                <span className="text-xl font-semibold font-mono text-stone-900 dark:text-zinc-100">
                   {results.rtdetr_count}
                 </span>
               </div>
-              <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800">
-                <span className="text-[10px] font-mono text-emerald-400 block">Fused WBF</span>
-                <span className="text-xl font-semibold font-mono text-emerald-400">
+              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
+                <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 block">Fused WBF</span>
+                <span className="text-xl font-semibold font-mono text-emerald-700 dark:text-emerald-400">
                   {filteredDetections.length}
                 </span>
               </div>
@@ -279,14 +279,14 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
 
           {/* Root Cause Recommendations */}
           {results.tips && results.tips.length > 0 && (
-            <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-800/40 text-amber-200">
-              <div className="flex items-center gap-2 mb-2 text-amber-300">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/40 text-amber-900 dark:text-amber-200">
+              <div className="flex items-center gap-2 mb-2 text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider">
                   Process Diagnostics & Root Cause
                 </h3>
               </div>
-              <ul className="space-y-1.5 text-xs text-amber-200/90 leading-relaxed list-disc pl-4">
+              <ul className="space-y-1.5 text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed list-disc pl-4">
                 {results.tips.map((tip, i) => (
                   <li key={i}>{tip}</li>
                 ))}
@@ -296,11 +296,11 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
 
           {/* Anomaly Catalog */}
           <div className="flex-1 flex flex-col min-h-[220px]">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
+            <div className="flex items-center justify-between border-b border-stone-200 dark:border-zinc-800 pb-2 mb-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-800 dark:text-zinc-300">
                 Detected Defect Catalog
               </h3>
-              <span className="text-xs font-mono text-zinc-400">
+              <span className="text-xs font-mono text-stone-700 dark:text-zinc-400">
                 {filteredDetections.length} items
               </span>
             </div>
@@ -312,11 +312,11 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="p-6 rounded-xl bg-zinc-900 border border-zinc-800 text-center my-auto flex flex-col items-center gap-2"
+                  className="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 text-center my-auto flex flex-col items-center gap-2"
                 >
-                  <CheckCircle2 className="w-7 h-7 text-emerald-400" />
-                  <p className="text-xs font-medium text-zinc-200">Quality Assurance Passed</p>
-                  <p className="text-[11px] text-zinc-500 max-w-xs">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-700 dark:text-emerald-400" />
+                  <p className="text-xs font-medium text-stone-900 dark:text-zinc-200">Quality Assurance Passed</p>
+                  <p className="text-[11px] text-stone-600 dark:text-zinc-400 max-w-xs">
                     No anomalies detected above {(minConf * 100).toFixed(0)}% confidence threshold.
                   </p>
                 </motion.div>
@@ -331,8 +331,8 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                         onMouseLeave={() => setHoveredIndex(null)}
                         className={`p-3 rounded-xl border text-xs transition-colors cursor-pointer ${
                           isHovered
-                            ? "border-sky-500 bg-sky-950/20 text-zinc-100"
-                            : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 text-zinc-300"
+                            ? "border-sky-500 bg-sky-50 dark:bg-sky-950/20 text-stone-900 dark:text-zinc-100"
+                            : "border-stone-200 dark:border-zinc-800 bg-[#fffdf8] dark:bg-zinc-900/60 hover:border-stone-400 dark:hover:border-zinc-700 text-stone-800 dark:text-zinc-300"
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
@@ -341,23 +341,23 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                               className={`px-1.5 py-0.5 rounded font-mono font-bold text-[10px] ${
                                 isHovered
                                   ? "bg-sky-500 text-black"
-                                  : "bg-rose-950 text-rose-300 border border-rose-800/60"
+                                  : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800/60"
                               }`}
                             >
                               {det.class}
                             </span>
-                            <span className="font-medium text-zinc-200">{det.full_name}</span>
+                            <span className="font-medium text-stone-900 dark:text-zinc-200">{det.full_name}</span>
                           </div>
 
                           <div className="flex items-center gap-2 font-mono">
-                            <span className="text-zinc-400 text-[11px]">
+                            <span className="text-stone-700 dark:text-zinc-400 text-[11px]">
                               {(det.confidence * 100).toFixed(1)}%
                             </span>
-                            {isHovered && <Crosshair className="w-3.5 h-3.5 text-sky-400" />}
+                            {isHovered && <Crosshair className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                        <div className="flex items-center justify-between text-[11px] font-mono text-stone-700 dark:text-zinc-400">
                           <span>Source: {det.source}</span>
                           <span>
                             [{det.bbox.map((n) => Math.round(n)).join(", ")}]
