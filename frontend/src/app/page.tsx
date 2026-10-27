@@ -5,10 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FileUploader } from "@/components/ui/FileUploader";
 import { ResultsView } from "@/components/ui/ResultsView";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { PipelineStatus } from "@/components/ui/PipelineStatus";
+import type { InferenceResults } from "@/lib/types";
 import { Cpu, ShieldCheck } from "lucide-react";
 
 export default function Home() {
-  const [inferenceData, setInferenceData] = useState<{ fileKey: string; results: any } | null>(null);
+  const [inferenceData, setInferenceData] = useState<{ fileKey: string; results: InferenceResults } | null>(null);
 
   return (
     <div className="min-h-screen bg-[#f7f4ec] dark:bg-zinc-950 text-stone-900 dark:text-zinc-100 flex flex-col font-sans selection:bg-emerald-200 selection:text-emerald-900 dark:selection:bg-emerald-500/30 dark:selection:text-emerald-200">
@@ -27,16 +29,13 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-xs text-stone-700 dark:text-zinc-400 font-mono hidden sm:block">
-                Dual-Track Ensemble: YOLO26n + RT-DETR (WBF IoU 0.40)
+                Dual-Track Ensemble: YOLO26n + RT-DETR (WBF IoU 0.50)
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-full whitespace-nowrap bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 text-xs font-mono text-stone-800 dark:text-zinc-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>Pipeline Online</span>
-            </div>
+            <PipelineStatus />
             <ThemeToggle />
           </div>
         </div>

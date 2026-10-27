@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -10,162 +10,176 @@ import {
   CheckCircle2,
   Crosshair,
   Layers,
+  ScanSearch,
 } from "lucide-react";
-
-interface Detection {
-  class: string;
-  full_name: string;
-  confidence: number;
-  bbox: [number, number, number, number];
-  source: string;
-}
+import type { Detection, InferenceResults } from "@/lib/types";
 
 interface ResultsViewProps {
   fileKey: string;
-  results: {
-    yolo_count: number;
-    rtdetr_count: number;
-    fused_count: number;
-    detections: Detection[];
-    tips: string[];
-  };
+  results: InferenceResults;
   onReset: () => void;
 }
+
+const MAX_CANVAS_H = 560;
+type HoverSource = "canvas" | "list";
 
 export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const [minConf, setMinConf] = useState(0.45);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  // 0.25 is the reporting threshold the detectors were evaluated at.
+  const [minConf, setMinConf] = useState(0.25);
+  const [hovered, setHovered] = useState<{ index: number; source: HoverSource } | null>(null);
+  const [loaded, setLoaded] = useState<{ src: string; el: HTMLImageElement } | null>(null);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [containerW, setContainerW] = useState(0);
 
-  const filteredDetections = results.detections.filter((d) => d.confidence >= minConf);
+  const hoveredIndex = hovered?.index ?? null;
+  const filteredDetections = useMemo(
+    () => results.detections.filter((d) => d.confidence >= minConf),
+    [results.detections, minConf]
+  );
 
-  const renderCanvas = useCallback(() => {
-    if (!canvasRef.current || !containerRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const imageUrl =
-      fileKey.startsWith("blob:") || fileKey.startsWith("data:") || fileKey.startsWith("http")
-        ? fileKey
-        : `${apiBase}/${fileKey}`;
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = imageUrl;
-
-    img.onload = () => {
-      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
-      const containerWidth = containerRef.current!.clientWidth;
-      const scale = containerWidth / img.width;
-      const displayWidth = img.width * scale;
-      const displayHeight = img.height * scale;
-
-      canvas.width = displayWidth;
-      canvas.height = displayHeight;
-
-      // Draw background image
-      ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
-
-      // Draw bounding boxes
-      filteredDetections.forEach((det, i) => {
-        const isHovered = hoveredIndex === i;
-        const [x1, y1, x2, y2] = det.bbox;
-        const scaledX1 = x1 * scale;
-        const scaledY1 = y1 * scale;
-        const scaledW = (x2 - x1) * scale;
-        const scaledH = (y2 - y1) * scale;
-
-        if (isHovered) {
-          // Highlight fill tint
-          ctx.fillStyle = "rgba(56, 189, 248, 0.18)";
-          ctx.fillRect(scaledX1, scaledY1, scaledW, scaledH);
-
-          // Active border
-          ctx.strokeStyle = "#38bdf8";
-          ctx.lineWidth = 2.5;
-          ctx.strokeRect(scaledX1, scaledY1, scaledW, scaledH);
-
-          // Crosshair corner guides
-          const cornerLen = Math.min(10, scaledW / 3, scaledH / 3);
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          // Top-left
-          ctx.moveTo(scaledX1, scaledY1 + cornerLen);
-          ctx.lineTo(scaledX1, scaledY1);
-          ctx.lineTo(scaledX1 + cornerLen, scaledY1);
-          // Top-right
-          ctx.moveTo(scaledX1 + scaledW - cornerLen, scaledY1);
-          ctx.lineTo(scaledX1 + scaledW, scaledY1);
-          ctx.lineTo(scaledX1 + scaledW, scaledY1 + cornerLen);
-          // Bottom-left
-          ctx.moveTo(scaledX1, scaledY1 + scaledH - cornerLen);
-          ctx.lineTo(scaledX1, scaledY1 + scaledH);
-          ctx.lineTo(scaledX1 + cornerLen, scaledY1 + scaledH);
-          // Bottom-right
-          ctx.moveTo(scaledX1 + scaledW - cornerLen, scaledY1 + scaledH);
-          ctx.lineTo(scaledX1 + scaledW, scaledY1 + scaledH);
-          ctx.lineTo(scaledX1 + scaledW, scaledY1 + scaledH - cornerLen);
-          ctx.stroke();
-        } else {
-          // Standard defect box (rose-500)
-          ctx.strokeStyle = "#f43f5e";
-          ctx.lineWidth = 1.75;
-          ctx.strokeRect(scaledX1, scaledY1, scaledW, scaledH);
-        }
-
-        // Draw precision label pill
-        const labelText = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
-        ctx.font = "600 11px monospace";
-        const textWidth = ctx.measureText(labelText).width;
-        const pillWidth = textWidth + 10;
-        const pillHeight = 18;
-        const pillY = Math.max(0, scaledY1 - pillHeight - 3);
-
-        ctx.fillStyle = isHovered ? "#0284c7" : "rgba(15, 23, 42, 0.9)";
-        ctx.fillRect(scaledX1, pillY, pillWidth, pillHeight);
-
-        ctx.strokeStyle = isHovered ? "#38bdf8" : "#f43f5e";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(scaledX1, pillY, pillWidth, pillHeight);
-
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(labelText, scaledX1 + 5, pillY + 13);
-      });
-    };
-  }, [fileKey, filteredDetections, hoveredIndex]);
+  // Load the uploaded image once; hover redraws must not reload it.
+  useEffect(() => {
+    const el = new Image();
+    el.onload = () => setLoaded({ src: fileKey, el });
+    el.onerror = () => setFailedSrc(fileKey);
+    el.src = fileKey;
+  }, [fileKey]);
+  const img = loaded?.src === fileKey ? loaded.el : null;
+  const imgFailed = failedSrc === fileKey;
 
   useEffect(() => {
-    renderCanvas();
-  }, [renderCanvas]);
+    const node = containerRef.current;
+    if (!node) return;
+    const update = () => setContainerW(node.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
 
-  // Handle canvas click/move to highlight corresponding defect
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !imageSize) return;
+  // Displayed size: fit the image inside the pane without distorting it.
+  const layout = useMemo(() => {
+    if (!img || containerW === 0) return null;
+    const scale = Math.min(containerW / img.naturalWidth, MAX_CANVAS_H / img.naturalHeight);
+    return { scale, cssW: img.naturalWidth * scale, cssH: img.naturalHeight * scale };
+  }, [img, containerW]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    if (!canvas || !img || !layout) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const { scale, cssW, cssH } = layout;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.drawImage(img, 0, 0, cssW, cssH);
 
-    const scale = canvas.width / imageSize.width;
-
-    const foundIndex = filteredDetections.findIndex((det) => {
+    filteredDetections.forEach((det, i) => {
+      const isHovered = hoveredIndex === i;
       const [x1, y1, x2, y2] = det.bbox;
-      return (
-        clickX >= x1 * scale &&
-        clickX <= x2 * scale &&
-        clickY >= y1 * scale &&
-        clickY <= y2 * scale
-      );
-    });
+      const bx = x1 * scale;
+      const by = y1 * scale;
+      const bw = (x2 - x1) * scale;
+      const bh = (y2 - y1) * scale;
 
-    setHoveredIndex(foundIndex !== -1 ? foundIndex : null);
+      if (isHovered) {
+        ctx.fillStyle = "rgba(56, 189, 248, 0.18)";
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(bx, by, bw, bh);
+
+        // Crosshair corner guides
+        const c = Math.min(10, bw / 3, bh / 3);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(bx, by + c); ctx.lineTo(bx, by); ctx.lineTo(bx + c, by);
+        ctx.moveTo(bx + bw - c, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by + c);
+        ctx.moveTo(bx, by + bh - c); ctx.lineTo(bx, by + bh); ctx.lineTo(bx + c, by + bh);
+        ctx.moveTo(bx + bw - c, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx + bw, by + bh - c);
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = "#f43f5e";
+        ctx.lineWidth = 1.75;
+        ctx.strokeRect(bx, by, bw, bh);
+      }
+
+      // Label pill, kept inside the canvas
+      const label = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
+      ctx.font = "600 11px monospace";
+      const pillW = ctx.measureText(label).width + 10;
+      const pillH = 18;
+      const pillX = Math.min(Math.max(0, bx), Math.max(0, cssW - pillW));
+      const pillY = by - pillH - 3 >= 0 ? by - pillH - 3 : Math.min(by + 2, cssH - pillH);
+
+      ctx.fillStyle = isHovered ? "#0284c7" : "rgba(15, 23, 42, 0.9)";
+      ctx.fillRect(pillX, pillY, pillW, pillH);
+      ctx.strokeStyle = isHovered ? "#38bdf8" : "#f43f5e";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(pillX, pillY, pillW, pillH);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, pillX + 5, pillY + 13);
+    });
+  }, [img, layout, filteredDetections, hoveredIndex]);
+
+  // Hovering a box on the image brings its catalogue entry into view (inside the list only).
+  useEffect(() => {
+    if (!hovered || hovered.source !== "canvas") return;
+    const list = listRef.current;
+    const item = itemRefs.current[hovered.index];
+    if (!list || !item) return;
+    const top = item.offsetTop - list.offsetTop;
+    if (top < list.scrollTop) list.scrollTop = top - 4;
+    else if (top + item.offsetHeight > list.scrollTop + list.clientHeight)
+      list.scrollTop = top + item.offsetHeight - list.clientHeight + 4;
+  }, [hovered]);
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!layout) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / layout.scale;
+    const y = (e.clientY - rect.top) / layout.scale;
+
+    // When boxes overlap, pick the smallest one under the pointer.
+    let best = -1;
+    let bestArea = Infinity;
+    filteredDetections.forEach((det, i) => {
+      const [x1, y1, x2, y2] = det.bbox;
+      if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+        const area = (x2 - x1) * (y2 - y1);
+        if (area < bestArea) {
+          best = i;
+          bestArea = area;
+        }
+      }
+    });
+    setHovered(best === -1 ? null : { index: best, source: "canvas" });
   };
+
+  const activeDetection: Detection | null = hoveredIndex !== null ? filteredDetections[hoveredIndex] ?? null : null;
+
+  // Detail card sits under the highlighted box, or above it when there is no room below.
+  const tooltipStyle = useMemo<React.CSSProperties | null>(() => {
+    if (!activeDetection || !layout) return null;
+    const [x1, y1, , y2] = activeDetection.bbox;
+    const cardW = Math.min(250, layout.cssW);
+    const left = Math.min(Math.max(0, x1 * layout.scale), Math.max(0, layout.cssW - cardW));
+    const below = y2 * layout.scale + 8;
+    const top = below + 96 <= layout.cssH ? below : Math.max(0, y1 * layout.scale - 104);
+    return { left, top, width: cardW };
+  }, [activeDetection, layout]);
+
+  const route = results.route;
+  const imgW = img?.naturalWidth ?? results.image?.width;
+  const imgH = img?.naturalHeight ?? results.image?.height;
 
   return (
     <div className="w-full bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xl text-stone-900 dark:text-zinc-100 flex flex-col">
@@ -189,6 +203,7 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
         </div>
 
         <button
+          type="button"
           onClick={onReset}
           className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-stone-100 dark:bg-zinc-800 hover:bg-stone-200 dark:hover:bg-zinc-700 border border-stone-300 dark:border-zinc-700 text-xs font-medium text-stone-900 dark:text-zinc-200 transition-colors cursor-pointer"
         >
@@ -203,18 +218,22 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
           <div className="space-y-4">
             {/* Filter Slider */}
             <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-[#fffdf8] dark:bg-zinc-900/60 border border-stone-200 dark:border-zinc-800">
-              <div className="flex items-center gap-2 text-xs font-medium text-stone-800 dark:text-zinc-300">
+              <label htmlFor="conf-slider" className="flex items-center gap-2 text-xs font-medium text-stone-800 dark:text-zinc-300">
                 <SlidersHorizontal className="w-4 h-4 text-stone-700 dark:text-zinc-400" />
                 <span>Confidence Threshold</span>
-              </div>
+              </label>
 
               <div className="flex items-center gap-3 flex-1 max-w-xs">
                 <input
+                  id="conf-slider"
                   type="range"
                   min="20"
                   max="95"
-                  value={minConf * 100}
-                  onChange={(e) => setMinConf(parseInt(e.target.value) / 100)}
+                  value={Math.round(minConf * 100)}
+                  onChange={(e) => {
+                    setHovered(null);
+                    setMinConf(parseInt(e.target.value) / 100);
+                  }}
                   className="w-full h-1.5 bg-stone-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-600 dark:accent-emerald-500"
                 />
                 <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-stone-100 dark:bg-zinc-800 border border-stone-300 dark:border-zinc-700 text-stone-900 dark:text-zinc-200 min-w-[42px] text-center">
@@ -226,29 +245,104 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
             {/* Inspection Canvas Area */}
             <div
               ref={containerRef}
-              className="w-full relative rounded-xl overflow-hidden border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-center"
+              className="w-full rounded-xl overflow-hidden border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+              style={{ minHeight: layout ? undefined : 240 }}
             >
-              <canvas
-                ref={canvasRef}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseLeave={() => setHoveredIndex(null)}
-                className="w-full max-h-[560px] object-contain cursor-crosshair block"
-              />
+              {imgFailed ? (
+                <p className="p-6 text-xs text-center text-stone-700 dark:text-zinc-400">
+                  The uploaded image could not be displayed.
+                </p>
+              ) : (
+                <div className="relative mx-auto" style={layout ? { width: layout.cssW, height: layout.cssH } : undefined}>
+                  <canvas
+                    ref={canvasRef}
+                    role="img"
+                    aria-label={`Uploaded scan with ${filteredDetections.length} detected defects outlined`}
+                    onMouseMove={handleCanvasMouseMove}
+                    onMouseLeave={() => setHovered((h) => (h?.source === "canvas" ? null : h))}
+                    className="cursor-crosshair block"
+                    style={layout ? { width: layout.cssW, height: layout.cssH } : undefined}
+                  />
+                  {activeDetection && tooltipStyle && (
+                    <div
+                      className="pointer-events-none absolute z-10 rounded-lg border border-sky-500 bg-white/95 dark:bg-zinc-900/95 p-2.5 text-[11px] shadow-lg text-stone-900 dark:text-zinc-100"
+                      style={tooltipStyle}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold truncate">{activeDetection.full_name}</span>
+                        <span className="font-mono shrink-0">{(activeDetection.confidence * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="mt-1 font-mono text-stone-700 dark:text-zinc-400">
+                        {activeDetection.source === "ENSEMBLE (WBF)"
+                          ? `Both detectors agree${
+                              activeDetection.yolo_conf != null && activeDetection.detr_conf != null
+                                ? `: YOLO26n ${(activeDetection.yolo_conf * 100).toFixed(0)}%, RT-DETR ${(activeDetection.detr_conf * 100).toFixed(0)}%`
+                                : ""
+                            }`
+                          : `${activeDetection.source} only, not confirmed by the other detector`}
+                      </div>
+                      <div className="mt-1 font-mono text-stone-700 dark:text-zinc-400">
+                        {Math.round(activeDetection.bbox[2] - activeDetection.bbox[0])} ×{" "}
+                        {Math.round(activeDetection.bbox[3] - activeDetection.bbox[1])} px at (
+                        {Math.round(activeDetection.bbox[0])}, {Math.round(activeDetection.bbox[1])})
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-stone-600 dark:text-zinc-400">
+          <div className="mt-3 flex items-center justify-between gap-3 text-[11px] font-mono text-stone-600 dark:text-zinc-400">
             <span>Hover bounding boxes or list items to isolate</span>
-            {imageSize && (
-              <span>
-                Original: {imageSize.width} × {imageSize.height} px
-              </span>
-            )}
+            <span className="text-right">
+              {imgW && imgH ? `Original: ${imgW} × ${imgH} px` : null}
+              {results.timings_ms?.total ? ` · ${(results.timings_ms.total / 1000).toFixed(1)} s` : null}
+            </span>
           </div>
         </div>
 
         {/* Right Column: Telemetry, Recommendations, Anomaly List */}
         <div className="lg:col-span-5 p-6 bg-[#fffdf8] dark:bg-zinc-900/50 flex flex-col space-y-6">
+          {/* Resolution check: which path this image took */}
+          {route && (
+            <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-stone-700 dark:text-zinc-400 uppercase tracking-wider">
+                  <ScanSearch className="w-3.5 h-3.5" />
+                  <span>Resolution Check</span>
+                </div>
+                <span
+                  className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded border ${
+                    route.needs_sr
+                      ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40"
+                  }`}
+                >
+                  {route.needs_sr ? "Enhanced before detection" : "Direct, no enhancement"}
+                </span>
+              </div>
+              <p className="text-xs text-stone-800 dark:text-zinc-300 leading-relaxed">
+                {route.needs_sr ? `${route.method}. ${route.reason}.` : `${route.reason}.`}
+              </p>
+              <dl className="mt-2.5 grid grid-cols-3 gap-2 text-[11px] font-mono">
+                {(
+                  [
+                    ["Edge density", route.metrics.edge_density, route.thresholds.edge_density, 3],
+                    ["Contrast", route.metrics.contrast, route.thresholds.contrast, 1],
+                    ["HF energy", route.metrics.hf_ratio, route.thresholds.hf_ratio, 3],
+                  ] as const
+                ).map(([name, value, tau, digits]) => (
+                  <div key={name} className="rounded-lg bg-stone-100 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700/60 px-2 py-1.5">
+                    <dt className="text-stone-700 dark:text-zinc-400">{name}</dt>
+                    <dd className="text-stone-900 dark:text-zinc-100 font-semibold">{value.toFixed(digits)}</dd>
+                    <dd className="text-stone-600 dark:text-zinc-400">τ {tau}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
           {/* Telemetry Metrics */}
           <div>
             <div className="flex items-center gap-1.5 text-xs font-medium text-stone-700 dark:text-zinc-400 uppercase tracking-wider mb-2.5">
@@ -321,15 +415,21 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                   </p>
                 </motion.div>
               ) : (
-                <div className="space-y-2 overflow-y-auto max-h-[300px] pr-1 custom-scrollbar">
+                <div ref={listRef} className="relative space-y-2 overflow-y-auto max-h-[340px] pr-1 custom-scrollbar">
                   {filteredDetections.map((det, i) => {
                     const isHovered = hoveredIndex === i;
                     return (
                       <div
                         key={`${det.class}-${i}`}
-                        onMouseEnter={() => setHoveredIndex(i)}
-                        onMouseLeave={() => setHoveredIndex(null)}
-                        className={`p-3 rounded-xl border text-xs transition-colors cursor-pointer ${
+                        ref={(el) => {
+                          itemRefs.current[i] = el;
+                        }}
+                        tabIndex={0}
+                        onMouseEnter={() => setHovered({ index: i, source: "list" })}
+                        onMouseLeave={() => setHovered((h) => (h?.index === i ? null : h))}
+                        onFocus={() => setHovered({ index: i, source: "list" })}
+                        onBlur={() => setHovered((h) => (h?.index === i ? null : h))}
+                        className={`p-3 rounded-xl border text-xs transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-500 ${
                           isHovered
                             ? "border-sky-500 bg-sky-50 dark:bg-sky-950/20 text-stone-900 dark:text-zinc-100"
                             : "border-stone-200 dark:border-zinc-800 bg-[#fffdf8] dark:bg-zinc-900/60 hover:border-stone-400 dark:hover:border-zinc-700 text-stone-800 dark:text-zinc-300"
@@ -359,9 +459,7 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
 
                         <div className="flex items-center justify-between text-[11px] font-mono text-stone-700 dark:text-zinc-400">
                           <span>Source: {det.source}</span>
-                          <span>
-                            [{det.bbox.map((n) => Math.round(n)).join(", ")}]
-                          </span>
+                          <span>[{det.bbox.map((n) => Math.round(n)).join(", ")}]</span>
                         </div>
                       </div>
                     );

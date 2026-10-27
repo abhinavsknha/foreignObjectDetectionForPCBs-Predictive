@@ -10,3 +10,7 @@ python-dotenv==1.0.1
 pydantic==2.6.3
 pydantic-settings==2.2.1
 python-multipart==0.0.9
+ultralytics>=8.4.0
+ensemble-boxes==1.0.9
+opencv-python-headless
+numpy
