@@ -10,6 +10,7 @@ export interface Detection {
 
 export interface Route {
   needs_sr: boolean;
+  gate_flagged?: boolean;
   path: "direct" | "super_resolution";
   reason: string;
   method: string | null;

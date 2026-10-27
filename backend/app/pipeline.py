@@ -21,6 +21,9 @@ W_YOLO, W_DETR = 1.0, 1.5     # asymmetric track weights
 FUSE_IOU = 0.50
 TAU_EDGE, TAU_CONTRAST, TAU_HF = 0.030, 25.0, 0.700
 SR_FACTOR, SR_ALPHA, SR_SIGMA = 2, 1.5, 3
+# "gate" applies super-resolution when the resolution check asks for it (as documented);
+# "off" still runs and reports the check but never enhances.
+SR_POLICY = os.getenv("SR_POLICY", "gate").lower()
 
 CLASS_MAP = {
     "SH": "Short",
@@ -228,6 +231,10 @@ def run_pipeline(image_path, models, progress=None):
     base = limit_size(img)
     route = check_resolution(base)
     route["native"] = {"width": W, "height": H}
+    route["gate_flagged"] = route["needs_sr"]
+    if route["needs_sr"] and SR_POLICY == "off":
+        route.update(needs_sr=False, path="direct",
+                     reason=route["reason"] + ". Enhancement is switched off on this server, so the image is used as uploaded")
     route["method"] = (f"Bicubic {SR_FACTOR}x + unsharp mask (alpha {SR_ALPHA})" if route["needs_sr"] else None)
     timings = {"resolution_check": (time.perf_counter() - t) * 1000}
 
