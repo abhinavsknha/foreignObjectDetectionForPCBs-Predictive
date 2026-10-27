@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UploadCloud, Loader2, Image as ImageIcon, Check, AlertTriangle, RotateCcw, Minus } from "lucide-react";
-import { API_HEADERS, getApiBase } from "@/lib/api";
+import { API_HEADERS, fetchRetry, getApiBase } from "@/lib/api";
 import type { InferenceResults, Route } from "@/lib/types";
 
 interface FileUploaderProps {
@@ -162,18 +162,25 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const uploadRes = await fetch(`${base}/api/upload/local`, { method: "POST", headers: API_HEADERS, body: formData });
-      if (!uploadRes.ok) {
-        const detail = await uploadRes.json().catch(() => null);
-        throw new Error(detail?.detail || `Upload failed (${uploadRes.status})`);
+      // One request uploads the image and queues the inspection.
+      let inferRes = await fetchRetry(`${base}/api/inspect`, { method: "POST", headers: API_HEADERS, body: formData });
+      if (inferRes.status === 404) {
+        // An older back end without /api/inspect: upload, then trigger.
+        const uploadRes = await fetchRetry(`${base}/api/upload/local`, { method: "POST", headers: API_HEADERS, body: formData });
+        if (!uploadRes.ok) {
+          const detail = await uploadRes.json().catch(() => null);
+          throw new Error(detail?.detail || `Upload failed (${uploadRes.status})`);
+        }
+        const uploadData = await uploadRes.json();
+        inferRes = await fetchRetry(`${base}/api/inference/trigger?file_key=${encodeURIComponent(uploadData.file_key)}`, {
+          method: "POST",
+          headers: API_HEADERS,
+        });
       }
-      const uploadData = await uploadRes.json();
-
-      const inferRes = await fetch(`${base}/api/inference/trigger?file_key=${encodeURIComponent(uploadData.file_key)}`, {
-        method: "POST",
-        headers: API_HEADERS,
-      });
-      if (!inferRes.ok) throw new Error(`Could not start the inspection (${inferRes.status})`);
+      if (!inferRes.ok) {
+        const detail = await inferRes.json().catch(() => null);
+        throw new Error(detail?.detail || `Could not start the inspection (${inferRes.status})`);
+      }
       const inferData = await inferRes.json();
 
       setTaskId(inferData.task_id);

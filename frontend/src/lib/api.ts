@@ -23,3 +23,19 @@ export function getApiBase(): Promise<string> {
   if (!cached) cached = loadApiBase();
   return cached;
 }
+
+// Free tunnels drop the odd request. Retry network failures and gateway errors a couple of times.
+export async function fetchRetry(url: string, init?: RequestInit, tries = 3): Promise<Response> {
+  let lastError: unknown = new Error("Request failed");
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (![502, 503, 504].includes(res.status)) return res;
+      lastError = new Error(`Server returned ${res.status}`);
+    } catch (e) {
+      lastError = e;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+  }
+  throw lastError;
+}

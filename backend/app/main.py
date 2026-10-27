@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import logging
@@ -94,6 +95,13 @@ async def local_upload(file: UploadFile = File(...)):
     file_path = STORAGE / f"{uuid.uuid4()}.{ext}"
     file_path.write_bytes(data)
     return {"file_key": file_path.as_posix(), "message": "Uploaded to local storage mock"}
+
+
+@app.post("/api/inspect")
+async def inspect(file: UploadFile = File(...)):
+    """Upload and queue in one request, so a slow tunnel costs one round trip instead of two."""
+    saved = await local_upload(file)
+    return await run_in_threadpool(trigger_inference, saved["file_key"])
 
 
 def _run_inline(task_id: str, file_key: str):
