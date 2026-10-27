@@ -24,6 +24,9 @@ SR_FACTOR, SR_ALPHA, SR_SIGMA = 2, 1.5, 3
 # "gate" applies super-resolution when the resolution check asks for it (as documented);
 # "off" still runs and reports the check but never enhances.
 SR_POLICY = os.getenv("SR_POLICY", "gate").lower()
+# Super-resolution is for images smaller than the detector input. From this long-side size up, the image
+# already has the resolution the detectors work at, so it is never enhanced.
+SR_MAX_SIDE = int(os.getenv("SR_MAX_SIDE", "640"))
 
 CLASS_MAP = {
     "SH": "Short",
@@ -239,6 +242,10 @@ def run_pipeline(image_path, models, progress=None):
     if route["needs_sr"] and SR_POLICY == "off":
         route.update(needs_sr=False, path="direct",
                      reason=route["reason"] + ". Enhancement is switched off on this server, so the image is used as uploaded")
+    if route["needs_sr"] and max(H, W) >= SR_MAX_SIDE:
+        route.update(needs_sr=False, path="direct",
+                     reason=route["reason"] + f". The image is already {max(H, W)} px on its long side "
+                            f"(enhancement is only for images under {SR_MAX_SIDE} px), so it is not enhanced")
     route["method"] = (f"Bicubic {SR_FACTOR}x + unsharp mask (alpha {SR_ALPHA})" if route["needs_sr"] else None)
     timings = {"resolution_check": (time.perf_counter() - t) * 1000}
 

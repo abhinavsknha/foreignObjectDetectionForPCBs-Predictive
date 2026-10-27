@@ -4,6 +4,10 @@ export const API_HEADERS = { "bypass-tunnel-reminder": "true" };
 let cached: Promise<string> | null = null;
 
 async function loadApiBase(): Promise<string> {
+  // Opened from this machine (the local demo): talk to the local back end, no tunnel needed.
+  if (typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    return process.env.NEXT_PUBLIC_API_URL || `http://${window.location.hostname}:8000`;
+  }
   // public/config.json lets the backend address change with a commit instead of a rebuild.
   try {
     const res = await fetch("/config.json", { cache: "no-store" });

@@ -79,13 +79,18 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let failures = 0;
+    let lastStage = "";
     const started = Date.now();
 
     const tick = async () => {
       if (cancelled) return;
       try {
         const base = await getApiBase();
-        const res = await fetch(`${base}/api/inference/status/${taskId}`, { headers: API_HEADERS, cache: "no-store" });
+        // The server holds this request until the stage changes or the job ends, so a slow tunnel costs few round trips.
+        const res = await fetch(`${base}/api/inference/status/${taskId}?wait=15&since=${lastStage}`, {
+          headers: API_HEADERS,
+          cache: "no-store",
+        });
         if (!res.ok) throw new Error(`Status check returned ${res.status}`);
         const data = await res.json();
         failures = 0;
@@ -102,6 +107,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
           fail(data.error || "The inspection failed on the server.");
           return;
         }
+        lastStage = data.stage ?? lastStage;
         setTargetIdx((t) => Math.max(t, STAGE_INDEX[data.stage] ?? 1));
       } catch {
         failures += 1;
@@ -114,7 +120,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
         fail("The inspection is taking too long. The inference worker may be offline.");
         return;
       }
-      timer = setTimeout(tick, POLL_MS);
+      timer = setTimeout(tick, failures > 0 ? POLL_MS : 100);
     };
     tick();
     return () => {

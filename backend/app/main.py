@@ -136,8 +136,7 @@ def trigger_inference(file_key: str):
     return {"status": "queued", "task_id": task.id, "file_key": file_key}
 
 
-@app.get("/api/inference/status/{task_id}")
-def get_inference_status(task_id: str):
+def _status_snapshot(task_id: str):
     if INLINE:
         return _inline_tasks.get(task_id) or {"status": "failed", "error": "Unknown task"}
 
@@ -150,3 +149,15 @@ def get_inference_status(task_id: str):
         return {"status": "failed", "error": str(result.result)}
     info = result.info if result.state == "PROGRESS" and isinstance(result.info, dict) else {}
     return {"status": "processing", "stage": info.get("stage", "queued"), "route": info.get("route")}
+
+
+@app.get("/api/inference/status/{task_id}")
+def get_inference_status(task_id: str, wait: float = 0.0, since: str = ""):
+    """Job status. With wait > 0 the call holds until the stage differs from `since` or the job ends
+    (at most 25 s), so a client behind a slow tunnel needs far fewer round trips."""
+    deadline = time.time() + min(max(wait, 0.0), 25.0)
+    while True:
+        snap = _status_snapshot(task_id)
+        if snap["status"] != "processing" or snap.get("stage") != since or time.time() >= deadline:
+            return snap
+        time.sleep(0.15)
