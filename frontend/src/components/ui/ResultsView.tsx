@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
+  Download,
   AlertTriangle,
   Cpu,
   SlidersHorizontal,
@@ -22,6 +23,26 @@ interface ResultsViewProps {
 
 const MAX_CANVAS_H = 560;
 type HoverSource = "canvas" | "list";
+
+const csvCell = (v: string | number | null | undefined) => {
+  const text = v == null ? "" : String(v);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+// One row per fused detection currently shown, in the pixels of the uploaded image.
+function detectionsToCsv(detections: Detection[]): string {
+  const header = ["class", "defect", "confidence", "x1", "y1", "x2", "y2", "source", "yolo26n_confidence", "rtdetr_confidence"];
+  const rows = detections.map((d) => [
+    d.class,
+    d.full_name,
+    d.confidence.toFixed(4),
+    ...d.bbox.map((n) => n.toFixed(1)),
+    d.source,
+    d.yolo_conf == null ? "" : d.yolo_conf.toFixed(4),
+    d.detr_conf == null ? "" : d.detr_conf.toFixed(4),
+  ]);
+  return [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+}
 
 export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -177,6 +198,19 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
     return { left, top, width: cardW };
   }, [activeDetection, layout]);
 
+  const exportCsv = () => {
+    const blob = new Blob([detectionsToCsv(filteredDetections)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    link.download = `pcb-inspection-${stamp}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const route = results.route;
   const imgW = img?.naturalWidth ?? results.image?.width;
   const imgH = img?.naturalHeight ?? results.image?.height;
@@ -202,14 +236,25 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onReset}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-stone-100 dark:bg-zinc-800 hover:bg-stone-200 dark:hover:bg-zinc-700 border border-stone-300 dark:border-zinc-700 text-xs font-medium text-stone-900 dark:text-zinc-200 transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Inspect Next Scan</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={filteredDetections.length === 0}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-stone-100 dark:bg-zinc-800 hover:bg-stone-200 dark:hover:bg-zinc-700 border border-stone-300 dark:border-zinc-700 text-xs font-medium text-stone-900 dark:text-zinc-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-stone-100 dark:bg-zinc-800 hover:bg-stone-200 dark:hover:bg-zinc-700 border border-stone-300 dark:border-zinc-700 text-xs font-medium text-stone-900 dark:text-zinc-200 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Inspect Next Scan</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-stone-200 dark:divide-zinc-800">
