@@ -229,6 +229,54 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
   const imgW = img?.naturalWidth ?? results.image?.width;
   const imgH = img?.naturalHeight ?? results.image?.height;
 
+  // Plain-language reading of the resolution check, shown before the raw measurements.
+  const longSide = route ? Math.max(route.native.width, route.native.height) : 0;
+  const switchedOff = route?.reason.includes("switched off") ?? false;
+  const checkSummary = !route
+    ? ""
+    : route.needs_sr
+      ? "This scan looks soft or low in detail, so it was enlarged 2x and sharpened before the inspection. That can help the detectors pick out small defects."
+      : route.gate_flagged
+        ? switchedOff
+          ? "This scan looks soft, but image enhancement is switched off on this server, so it was inspected exactly as uploaded."
+          : `This scan looks soft, but at ${longSide} px it is already large enough for the detectors, so it was inspected exactly as uploaded.`
+        : "This scan already has enough detail, so it was inspected exactly as uploaded.";
+  const qualityChecks = route
+    ? [
+        {
+          label: "Fine detail",
+          technical: "edge density",
+          value: route.metrics.edge_density,
+          tau: route.thresholds.edge_density,
+          digits: 3,
+          meaning: "How much fine line detail the scan holds.",
+          low: "Low: it looks soft or blurry.",
+          ok: "There is enough detail.",
+        },
+        {
+          label: "Contrast",
+          technical: "local contrast",
+          value: route.metrics.contrast,
+          tau: route.thresholds.contrast,
+          digits: 1,
+          meaning: "How strongly dark and light areas stand out.",
+          low: "Low: it looks flat or washed out.",
+          ok: "Light and dark areas are clearly separated.",
+        },
+        {
+          label: "Sharpness",
+          technical: "high-frequency energy",
+          value: route.metrics.hf_ratio,
+          tau: route.thresholds.hf_ratio,
+          digits: 3,
+          meaning: "How much of the scan is crisp fine texture rather than smooth areas.",
+          low: "Low: it is mostly smooth.",
+          ok: "There is plenty of crisp texture.",
+        },
+      ].map((c) => ({ ...c, isLow: c.value < c.tau }))
+    : [];
+
+
   return (
     <div className="w-full bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xl text-stone-900 dark:text-zinc-100 flex flex-col">
       {/* Top Action Header */}
@@ -285,35 +333,9 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-stone-200 dark:divide-zinc-800">
-        {/* Left Column: Canvas Viewport & Controls */}
+        {/* Left Column: image, confidence slider, model telemetry */}
         <div className="lg:col-span-7 p-6 bg-[#f7f4ec] dark:bg-zinc-950 flex flex-col justify-between">
           <div className="space-y-4">
-            {/* Filter Slider */}
-            <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-[#fffdf8] dark:bg-zinc-900/60 border border-stone-200 dark:border-zinc-800">
-              <label htmlFor="conf-slider" className="flex items-center gap-2 text-xs font-medium text-stone-800 dark:text-zinc-300">
-                <SlidersHorizontal className="w-4 h-4 text-stone-700 dark:text-zinc-400" />
-                <span>Confidence Threshold</span>
-              </label>
-
-              <div className="flex items-center gap-3 flex-1 max-w-xs">
-                <input
-                  id="conf-slider"
-                  type="range"
-                  min="20"
-                  max="95"
-                  value={Math.round(minConf * 100)}
-                  onChange={(e) => {
-                    setHovered(null);
-                    setMinConf(parseInt(e.target.value) / 100);
-                  }}
-                  className="w-full h-1.5 bg-stone-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-600 dark:accent-emerald-500"
-                />
-                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-stone-100 dark:bg-zinc-800 border border-stone-300 dark:border-zinc-700 text-stone-900 dark:text-zinc-200 min-w-[42px] text-center">
-                  {(minConf * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-
             {/* Inspection Canvas Area */}
             <div
               ref={containerRef}
@@ -363,6 +385,59 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                 </div>
               )}
             </div>
+            {/* Filter Slider */}
+            <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-[#fffdf8] dark:bg-zinc-900/60 border border-stone-200 dark:border-zinc-800">
+              <label htmlFor="conf-slider" className="flex items-center gap-2 text-xs font-medium text-stone-800 dark:text-zinc-300">
+                <SlidersHorizontal className="w-4 h-4 text-stone-700 dark:text-zinc-400" />
+                <span>Confidence Threshold</span>
+              </label>
+
+              <div className="flex items-center gap-3 flex-1 max-w-xs">
+                <input
+                  id="conf-slider"
+                  type="range"
+                  min="20"
+                  max="95"
+                  value={Math.round(minConf * 100)}
+                  onChange={(e) => {
+                    setHovered(null);
+                    setMinConf(parseInt(e.target.value) / 100);
+                  }}
+                  className="w-full h-1.5 bg-stone-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-600 dark:accent-emerald-500"
+                />
+                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-stone-100 dark:bg-zinc-800 border border-stone-300 dark:border-zinc-700 text-stone-900 dark:text-zinc-200 min-w-[42px] text-center">
+                  {(minConf * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Telemetry Metrics */}
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-stone-700 dark:text-zinc-400 uppercase tracking-wider mb-2.5">
+                <Cpu className="w-3.5 h-3.5" />
+                <span>Model Telemetry</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
+                  <span className="text-[10px] font-mono text-stone-700 dark:text-zinc-400 block">YOLO26n</span>
+                  <span className="text-xl font-semibold font-mono text-stone-900 dark:text-zinc-100">
+                    {results.yolo_count}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
+                  <span className="text-[10px] font-mono text-stone-700 dark:text-zinc-400 block">RT-DETR</span>
+                  <span className="text-xl font-semibold font-mono text-stone-900 dark:text-zinc-100">
+                    {results.rtdetr_count}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
+                  <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 block">Fused WBF</span>
+                  <span className="text-xl font-semibold font-mono text-emerald-700 dark:text-emerald-400">
+                    {filteredDetections.length}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-3 text-[11px] font-mono text-stone-600 dark:text-zinc-400">
@@ -374,94 +449,10 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
           </div>
         </div>
 
-        {/* Right Column: Telemetry, Recommendations, Anomaly List */}
+        {/* Right Column: defect catalogue first, then recommendations and the resolution check */}
         <div className="lg:col-span-5 p-6 bg-[#fffdf8] dark:bg-zinc-900/50 flex flex-col space-y-6">
-          {/* Resolution check: which path this image took */}
-          {route && (
-            <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-stone-700 dark:text-zinc-400 uppercase tracking-wider">
-                  <ScanSearch className="w-3.5 h-3.5" />
-                  <span>Resolution Check</span>
-                </div>
-                <span
-                  className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded border ${
-                    route.needs_sr
-                      ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
-                      : "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40"
-                  }`}
-                >
-                  {route.needs_sr ? "Enhanced before detection" : "Direct, no enhancement"}
-                </span>
-              </div>
-              <p className="text-xs text-stone-800 dark:text-zinc-300 leading-relaxed">
-                {route.needs_sr ? `${route.method}. ${route.reason}.` : `${route.reason}.`}
-              </p>
-              <dl className="mt-2.5 grid grid-cols-3 gap-2 text-[11px] font-mono">
-                {(
-                  [
-                    ["Edge density", route.metrics.edge_density, route.thresholds.edge_density, 3],
-                    ["Contrast", route.metrics.contrast, route.thresholds.contrast, 1],
-                    ["HF energy", route.metrics.hf_ratio, route.thresholds.hf_ratio, 3],
-                  ] as const
-                ).map(([name, value, tau, digits]) => (
-                  <div key={name} className="rounded-lg bg-stone-100 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700/60 px-2 py-1.5">
-                    <dt className="text-stone-700 dark:text-zinc-400">{name}</dt>
-                    <dd className="text-stone-900 dark:text-zinc-100 font-semibold">{value.toFixed(digits)}</dd>
-                    <dd className="text-stone-600 dark:text-zinc-400">τ {tau}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          )}
-
-          {/* Telemetry Metrics */}
-          <div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-stone-700 dark:text-zinc-400 uppercase tracking-wider mb-2.5">
-              <Cpu className="w-3.5 h-3.5" />
-              <span>Model Telemetry</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
-                <span className="text-[10px] font-mono text-stone-700 dark:text-zinc-400 block">YOLO26n</span>
-                <span className="text-xl font-semibold font-mono text-stone-900 dark:text-zinc-100">
-                  {results.yolo_count}
-                </span>
-              </div>
-              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
-                <span className="text-[10px] font-mono text-stone-700 dark:text-zinc-400 block">RT-DETR</span>
-                <span className="text-xl font-semibold font-mono text-stone-900 dark:text-zinc-100">
-                  {results.rtdetr_count}
-                </span>
-              </div>
-              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
-                <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 block">Fused WBF</span>
-                <span className="text-xl font-semibold font-mono text-emerald-700 dark:text-emerald-400">
-                  {filteredDetections.length}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Root Cause Recommendations */}
-          {visibleTips.length > 0 && (
-            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/40 text-amber-900 dark:text-amber-200">
-              <div className="flex items-center gap-2 mb-2 text-amber-800 dark:text-amber-300">
-                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider">
-                  Process Diagnostics & Root Cause
-                </h3>
-              </div>
-              <ul className="space-y-1.5 text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed list-disc pl-4">
-                {visibleTips.map((tip, i) => (
-                  <li key={i}>{tip}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {/* Anomaly Catalog */}
-          <div className="flex-1 flex flex-col min-h-[220px]">
+          <div className="flex flex-col">
             <div className="flex items-center justify-between border-b border-stone-200 dark:border-zinc-800 pb-2 mb-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-800 dark:text-zinc-300">
                 Detected Defect Catalog
@@ -491,7 +482,7 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                   </p>
                 </motion.div>
               ) : (
-                <div ref={listRef} className="relative space-y-2 overflow-y-auto max-h-[340px] pr-1 custom-scrollbar">
+                <div ref={listRef} className="relative space-y-2 overflow-y-auto max-h-[420px] pr-1 custom-scrollbar">
                   {filteredDetections.map((det, i) => {
                     const isHovered = hoveredIndex === i;
                     return (
@@ -544,6 +535,86 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
               )}
             </AnimatePresence>
           </div>
+
+          {/* Root Cause Recommendations */}
+          {visibleTips.length > 0 && (
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/40 text-amber-900 dark:text-amber-200">
+              <div className="flex items-center gap-2 mb-2 text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider">
+                  Process Diagnostics & Root Cause
+                </h3>
+              </div>
+              <ul className="space-y-1.5 text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed list-disc pl-4">
+                {visibleTips.map((tip, i) => (
+                  <li key={i}>{tip}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Resolution check, in plain language first and the measurements after */}
+          {route && (
+            <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-stone-700 dark:text-zinc-400 uppercase tracking-wider">
+                  <ScanSearch className="w-3.5 h-3.5" />
+                  <span>Resolution Check</span>
+                </div>
+                <span
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
+                    route.needs_sr
+                      ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40"
+                  }`}
+                >
+                  {route.needs_sr ? "Enhanced before inspection" : "Inspected as uploaded"}
+                </span>
+              </div>
+
+              <p className="text-xs text-stone-900 dark:text-zinc-100 leading-relaxed">{checkSummary}</p>
+
+              <ul className="mt-3 space-y-2.5">
+                {qualityChecks.map((c) => (
+                  <li key={c.label} className="rounded-lg bg-stone-100 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700/60 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-stone-900 dark:text-zinc-100">
+                        {c.label} <span className="font-normal text-stone-600 dark:text-zinc-400">({c.technical})</span>
+                      </span>
+                      <span
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                          c.isLow
+                            ? "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-300"
+                            : "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
+                        }`}
+                      >
+                        {c.isLow ? "Low" : "Good"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-stone-700 dark:text-zinc-400">
+                      {c.meaning} {c.isLow ? c.low : c.ok}
+                    </p>
+                    <p className="mt-0.5 text-[11px] font-mono text-stone-600 dark:text-zinc-400">
+                      measured {c.value.toFixed(c.digits)}, needs at least {c.tau}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="mt-2.5 text-[11px] leading-relaxed text-stone-600 dark:text-zinc-400">
+                Rule: a scan is enhanced when its fine detail and contrast are both low, or when it is very soft overall.
+                Enhancement only applies to scans smaller than the detectors&apos; working size.
+              </p>
+
+              <details className="mt-2 text-[11px] text-stone-700 dark:text-zinc-400">
+                <summary className="cursor-pointer select-none font-medium text-stone-800 dark:text-zinc-300">Technical details</summary>
+                <p className="mt-1 font-mono leading-relaxed">
+                  {route.method ? `${route.method}. ` : ""}
+                  {route.reason}. Original size {route.native.width} × {route.native.height} px.
+                </p>
+              </details>
+            </div>
+          )}
         </div>
       </div>
     </div>
