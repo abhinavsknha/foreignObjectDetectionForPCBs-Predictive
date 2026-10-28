@@ -105,18 +105,22 @@ async def local_upload(file: UploadFile = File(...)):
 
 
 @app.post("/api/inspect")
-async def inspect(file: UploadFile = File(...)):
-    """Upload and queue in one request, so a slow tunnel costs one round trip instead of two."""
+async def inspect(file: UploadFile = File(...), reference: UploadFile | None = File(None)):
+    """Upload and queue in one request, so a slow tunnel costs one round trip instead of two.
+
+    An optional known-good `reference` image switches the inspection to a direct comparison against it.
+    """
     saved = await local_upload(file)
-    return await run_in_threadpool(trigger_inference, saved["file_key"])
+    ref_key = (await local_upload(reference))["file_key"] if reference is not None and reference.filename else ""
+    return await run_in_threadpool(trigger_inference, saved["file_key"], ref_key)
 
 
-def _run_inline(task_id: str, file_key: str):
+def _run_inline(task_id: str, file_key: str, reference_key: str = ""):
     def progress(stage, route=None):
         _inline_tasks[task_id].update(status="processing", stage=stage, route=route)
 
     try:
-        result = run_inference(file_key, progress)
+        result = run_inference(file_key, progress, reference_key)
         _inline_tasks[task_id] = {"status": "completed", "result": result}
     except Exception as e:  # noqa: BLE001
         log.exception("Inference failed")
@@ -124,15 +128,17 @@ def _run_inline(task_id: str, file_key: str):
 
 
 @app.post("/api/inference/trigger")
-def trigger_inference(file_key: str):
+def trigger_inference(file_key: str, reference_key: str = ""):
     """Queues the inspection (Redis and Celery) or runs it in this process (inline mode)."""
     _resolve_in_storage(file_key)
+    if reference_key:
+        _resolve_in_storage(reference_key)
     if INLINE:
         task_id = str(uuid.uuid4())
         _inline_tasks[task_id] = {"status": "processing", "stage": "queued", "route": None}
-        _pool.submit(_run_inline, task_id, file_key)
+        _pool.submit(_run_inline, task_id, file_key, reference_key)
         return {"status": "queued", "task_id": task_id, "file_key": file_key}
-    task = process_image_inference.delay(file_key=file_key)
+    task = process_image_inference.delay(file_key=file_key, reference_key=reference_key)
     return {"status": "queued", "task_id": task.id, "file_key": file_key}
 
 

@@ -63,6 +63,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [lastFile, setLastFile] = useState<File | null>(null);
+  const [reference, setReference] = useState<File | null>(null);
   const onCompleteRef = useRef(onInferenceComplete);
   useEffect(() => {
     onCompleteRef.current = onInferenceComplete;
@@ -167,6 +168,7 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
       const base = await getApiBase();
       const formData = new FormData();
       formData.append("file", selectedFile);
+      if (reference) formData.append("reference", reference);
 
       // One request uploads the image and queues the inspection.
       let inferRes = await fetchRetry(`${base}/api/inspect`, { method: "POST", headers: API_HEADERS, body: formData });
@@ -276,6 +278,39 @@ export function FileUploader({ onInferenceComplete }: FileUploaderProps) {
                   }}
                 />
               </label>
+
+              <div className="w-full rounded-lg border border-dashed border-stone-300 dark:border-zinc-700 px-3 py-2.5 text-left">
+                <p className="text-[11px] text-stone-700 dark:text-zinc-400 leading-relaxed">
+                  Optional: compare against a known-good board of the same design. Differences are then reported directly,
+                  which also catches defects the detectors were not trained to see.
+                </p>
+                <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-stone-900 dark:text-zinc-100 cursor-pointer focus-within:outline-2 focus-within:outline-emerald-600">
+                  <span className="px-2.5 py-1 rounded-md border border-stone-300 dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800">
+                    {reference ? "Change reference" : "Choose reference image"}
+                  </span>
+                  <span className="font-mono font-normal text-stone-600 dark:text-zinc-400 truncate max-w-[200px]">
+                    {reference ? reference.name : "none selected"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(e) => {
+                      if (e.target.files?.length) setReference(e.target.files[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {reference && (
+                  <button
+                    type="button"
+                    onClick={() => setReference(null)}
+                    className="ml-2 text-[11px] underline text-stone-600 dark:text-zinc-400"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
 
               <p className="text-[11px] font-mono text-stone-600 dark:text-zinc-400 pt-1">
                 Accepted: PNG, JPG, JPEG, BMP (up to 25 MB)

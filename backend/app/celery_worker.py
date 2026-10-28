@@ -79,10 +79,13 @@ def save_to_db(file_key, detections):
         print(f"[POSTGRES ERROR] Failed to save to DB: {e}")
 
 
-def run_inference(file_key, progress=None):
+def run_inference(file_key, progress=None, reference_key=""):
     """Run the full pipeline and persist the result. Shared by the Celery task and inline mode."""
     print(f"Starting ensemble inference for {file_key}...")
-    results = pipeline.run_pipeline(file_key, pipeline.get_models(), progress=progress)
+    if reference_key:
+        results = pipeline.compare_to_reference(file_key, reference_key, progress=progress)
+    else:
+        results = pipeline.run_pipeline(file_key, pipeline.get_models(), progress=progress)
     print(f"Ensemble completed in {results['timings_ms']['total'] / 1000:.2f}s "
           f"({results['route']['path']}, {results['fused_count']} fused detections)")
     # Saved in the background: the operator gets the result without waiting for the database.
@@ -91,8 +94,8 @@ def run_inference(file_key, progress=None):
 
 
 @celery_app.task(bind=True, name="process_image_inference")
-def process_image_inference(self, file_key: str):
+def process_image_inference(self, file_key: str, reference_key: str = ""):
     def progress(stage, route=None):
         self.update_state(state="PROGRESS", meta={"stage": stage, "route": route})
 
-    return run_inference(file_key, progress)
+    return run_inference(file_key, progress, reference_key)

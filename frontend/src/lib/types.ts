@@ -11,7 +11,7 @@ export interface Detection {
 export interface Route {
   needs_sr: boolean;
   gate_flagged?: boolean;
-  path: "direct" | "super_resolution";
+  path: "direct" | "super_resolution" | "reference";
   reason: string;
   method: string | null;
   native: { width: number; height: number };

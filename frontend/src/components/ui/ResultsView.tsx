@@ -234,7 +234,9 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
   const switchedOff = route?.reason.includes("switched off") ?? false;
   const checkSummary = !route
     ? ""
-    : route.needs_sr
+    : route.path === "reference"
+      ? "This scan was compared with the known-good reference board. Every region that differs from it is marked; the percentage shows how strong the change is."
+      : route.needs_sr
       ? "This scan looks soft or low in detail, so it was enlarged 2x and sharpened before the inspection. That can help the detectors pick out small defects."
       : route.gate_flagged
         ? switchedOff
@@ -367,7 +369,9 @@ export function ResultsView({ fileKey, results, onReset }: ResultsViewProps) {
                         <span className="font-mono shrink-0">{(activeDetection.confidence * 100).toFixed(1)}%</span>
                       </div>
                       <div className="mt-1 font-mono text-stone-700 dark:text-zinc-400">
-                        {activeDetection.source === "ENSEMBLE (WBF)"
+                        {activeDetection.source === "REFERENCE DIFF"
+                          ? "Differs from the known-good reference board"
+                          : activeDetection.source === "ENSEMBLE (WBF)"
                           ? `Both detectors agree${
                               activeDetection.yolo_conf != null && activeDetection.detr_conf != null
                                 ? `: YOLO26n ${(activeDetection.yolo_conf * 100).toFixed(0)}%, RT-DETR ${(activeDetection.detr_conf * 100).toFixed(0)}%`

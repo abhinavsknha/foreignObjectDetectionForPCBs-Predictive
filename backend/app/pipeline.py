@@ -214,6 +214,111 @@ def _best_match(box, label, boxes, scores, classes, min_iou=0.4):
     return float(scores[ok].max()) if ok.any() else None
 
 
+# ---------------------------------------------------------------- reference comparison
+DIFF_MIN_DELTA = 14        # per-channel change (0-255) that counts as a real difference
+DIFF_MIN_AREA = 12         # smallest changed region, in pixels at the image's own size
+
+
+def _align_to(img, ref):
+    """Bring the reference into the image's frame (resize, then a small ECC shift/rotation fix)."""
+    h, w = img.shape[:2]
+    if ref.shape[:2] != (h, w):
+        ref = cv2.resize(ref, (w, h), interpolation=cv2.INTER_AREA)
+    g1 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    g2 = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    warp = np.eye(2, 3, dtype=np.float32)
+    try:
+        _, warp = cv2.findTransformECC(g1, g2, warp, cv2.MOTION_EUCLIDEAN,
+                                       (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 60, 1e-5), None, 5)
+        ref = cv2.warpAffine(ref, warp, (w, h), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
+                             borderMode=cv2.BORDER_REPLICATE)
+    except cv2.error:
+        pass  # already aligned, or too different to refine: compare as is
+    return ref
+
+
+def compare_to_reference(image_path, reference_path, progress=None):
+    """Find where the scan differs from a known-good board of the same design.
+
+    Copper that disappeared is reported as Open, copper that appeared as Spurious Copper, and any other
+    change as a Conductor Foreign Object. The score is the strength of the change, not a model probability.
+    """
+    emit = progress or (lambda *a, **k: None)
+    t_start = time.perf_counter()
+    img = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+    ref = cv2.imread(str(reference_path), cv2.IMREAD_COLOR)
+    if img is None or ref is None:
+        raise ValueError("The scan or the reference image could not be read.")
+    H, W = img.shape[:2]
+
+    emit("checking_resolution")
+    route = check_resolution(limit_size(img))
+    route.update(native={"width": W, "height": H}, gate_flagged=route["needs_sr"], needs_sr=False,
+                 path="reference", method=None, mode="reference",
+                 reason="Compared with the known-good reference board; no enhancement is needed for a direct comparison")
+
+    emit("detecting", route=route)
+    ref = _align_to(img, ref)
+    # Remove overall lighting differences so only real changes remain.
+    ref_f = ref.astype(np.float32)
+    img_f = img.astype(np.float32)
+    for c in range(3):
+        m1, s1 = img_f[..., c].mean(), img_f[..., c].std() + 1e-6
+        m2, s2 = ref_f[..., c].mean(), ref_f[..., c].std() + 1e-6
+        ref_f[..., c] = (ref_f[..., c] - m2) * (s1 / s2) + m1
+    a = cv2.GaussianBlur(img_f, (0, 0), 1.2)
+    b = cv2.GaussianBlur(ref_f, (0, 0), 1.2)
+    delta = np.abs(a - b).max(axis=2)
+    mask = (delta > DIFF_MIN_DELTA).astype(np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+    lum_img = cv2.cvtColor(np.clip(a, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    lum_ref = cv2.cvtColor(np.clip(b, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+
+    detections = []
+    for i in range(1, n):
+        x, y, w, h, area = stats[i]
+        if area < DIFF_MIN_AREA:
+            continue
+        region = labels == i
+        strength = float(delta[region].mean())
+        signed = float((lum_img[region] - lum_ref[region]).mean())
+        if signed < -3:
+            name = "OP"      # darker than the good board where a lighter trace was: copper is gone
+        elif signed > 3:
+            name = "SC"      # lighter than the good board where there was bare mask: extra copper
+        else:
+            name = "CFO"
+        pad = 4
+        box = [max(0, x - pad), max(0, y - pad), min(W, x + w + pad), min(H, y + h + pad)]
+        detections.append({
+            "class": name,
+            "full_name": CLASS_MAP[name],
+            "confidence": float(min(0.99, 0.5 + strength / 80)),
+            "bbox": [float(v) for v in box],
+            "source": "REFERENCE DIFF",
+            "yolo_conf": None,
+            "detr_conf": None,
+        })
+    detections.sort(key=lambda d: d["confidence"], reverse=True)
+    emit("fusing", route=route)
+
+    tips = [TIPS[c] for c in dict.fromkeys(d["class"] for d in detections) if c in TIPS]
+    total = (time.perf_counter() - t_start) * 1000
+    return {
+        "yolo_count": 0,
+        "rtdetr_count": 0,
+        "fused_count": len(detections),
+        "detections": detections,
+        "tips": tips,
+        "route": route,
+        "image": {"width": W, "height": H, "green_share": 0.0},
+        "timings_ms": {"total": round(total, 1)},
+        "fusion": {"w_yolo": W_YOLO, "w_detr": W_DETR, "iou": FUSE_IOU, "min_confidence": REPORT_CONF},
+        "mode": "reference",
+    }
+
+
 # ---------------------------------------------------------------- full run
 def run_pipeline(image_path, models, progress=None):
     """Resolution check, optional super-resolution, both detectors, fusion.
