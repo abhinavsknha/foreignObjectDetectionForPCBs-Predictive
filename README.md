@@ -106,6 +106,7 @@ Based on the detected defect classes, the system evaluates the root cause in the
 │   ├── public/config.json       # Backend address used by the deployed site
 │   ├── package.json
 │   └── tsconfig.json
+├── notebooks/                   # Training notebooks for both detectors (Colab and Kaggle)
 ├── docker-compose.yml           # PostgreSQL (pgvector) and Redis services
 ├── start_app.bat                # Developer launcher: dev server, API and worker
 ├── start_demo.bat               # Demo: API + worker + public tunnel (for the Vercel site)

@@ -292,7 +292,7 @@ Based on DsPCBSD+ class distribution:
 - Save as `yolo26n_adaptive_best.pt`
 
 **Task 2.2: Retrain RT-DETR-L on adaptive dataset**
-- Same hyperparameters as current DETR_Track.ipynb
+- Same hyperparameters as current notebooks/DETR_Track.ipynb
 - 100 epochs, patience=20, batch=8 on Colab T4
 - Record: mAP@50, Precision, Recall, inference time
 - Save as `rtdetr_l_adaptive_best.pt`

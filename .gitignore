@@ -55,3 +55,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Notebook backups and checkpoints stay on disk but out of the repository
+*_colab_backup.ipynb
+.ipynb_checkpoints/
