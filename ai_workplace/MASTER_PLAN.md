@@ -18,7 +18,7 @@
 | EDA (class balance + annotation check) | ✅ Complete | `EDA_Results/` |
 | Data preprocessing (resize to 640×640) | ✅ Complete | `prepare_data.py` |
 | Data classification by defect type | ✅ Complete | `classifyData.py` |
-| Literature survey (30 papers, 2025) | ✅ Complete | `Antigravity MDs and Scripts/` |
+| Literature survey (30 papers, 2025) | ✅ Complete | `Research Notes and Scripts/` |
 | **Track 1: YOLO26n trained** | ✅ Complete | `yolo26n.pt` (5.1 MB), ~80% mAP@50 |
 | **Track 2: RT-DETR-L training** | 🔄 In Progress | Google Colab (epoch 1-3 of 100) |
 | ONNX export pipeline | ✅ Code ready | YOLO notebook Section 8 |
