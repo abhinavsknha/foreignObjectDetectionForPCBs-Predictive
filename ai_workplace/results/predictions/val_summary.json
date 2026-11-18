@@ -1,0 +1,15 @@
+{
+  "yolo26n": {
+    "precision": 0.8274,
+    "recall": 0.8051,
+    "mAP50": 0.8519,
+    "mAP50-95": 0.5098
+  },
+  "rtdetr_l": {
+    "precision": 0.8217,
+    "recall": 0.8065,
+    "mAP50": 0.8455,
+    "mAP50-95": 0.5045
+  },
+  "_note": "DsPCBSD+ official validation partition, 2,051 images / 4,092 instances, imgsz 640, conf 0.001 / IoU 0.7 (Ultralytics val defaults); checkpoints from MODEL RESULTS/MORE TRAINING."
+}
